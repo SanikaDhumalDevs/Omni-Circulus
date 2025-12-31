@@ -275,7 +275,7 @@ export default function AgentPage() {
         
         if (res.ok) {
             // Auto-success: No alert needed, just state update
-            setNegotiation(prev => ({ ...prev, status: 'WAITING_FOR_APPROVAL' }));
+           setNegotiation((prev: any) => ({ ...prev, status: 'WAITING_FOR_APPROVAL' }));
         } else {
             alert("❌ Agent Failed to dispatch emails: " + (data.error || "Unknown Error"));
             emailSentRef.current = false; // Allow retry if failed
