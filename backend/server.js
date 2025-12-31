@@ -4,7 +4,6 @@ const cors = require('cors');
 require('dotenv').config();
 
 // --- IMPORT MODELS TO ENSURE THEY ARE REGISTERED ---
-// (Crucial for the inline routes to work without "Schema not registered" errors)
 require('./models/Resource'); 
 require('./models/Negotiation');
 require('./models/Request');
@@ -23,7 +22,12 @@ const app = express();
 app.use(express.json({ limit: '50mb' })); 
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-app.use(cors());
+// --- ✅ FIX FOR MOBILE & VERCEL CONNECTION (CORS) ---
+app.use(cors({
+    origin: '*',  // This allows ALL devices (Mobile, Laptop, Vercel)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // --- 🚚 VIRTUAL LOGISTICS FLEET ---
 const VIRTUAL_FLEET = [
@@ -98,7 +102,7 @@ app.get('/api/dashboard/stats', async (req, res) => {
     const Resource = mongoose.model('Resource');
 
     // 1. Inventory
-    const inventory = await Resource.find({ ownerEmail: email }); // Note: Changed sellerEmail to ownerEmail to match your Resource schema
+    const inventory = await Resource.find({ ownerEmail: email }); 
     
     // 2. Buying (Incoming)
     const buying = await Negotiation.find({ 
@@ -156,14 +160,15 @@ app.use('/api/gate', gateRoute);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/negotiate', negotiationRoute);
-app.use('/api/dashboard', dashboardRoute); // Note: Inline stats route above will take precedence over stats in here
+app.use('/api/dashboard', dashboardRoute); 
 app.use('/api/auth', authRoute);
 app.use('/api/replay', replayRoute); 
 
-// MongoDB Connection
+// --- CONNECT TO DATABASE ---
 const mongoURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/omni-circulus';
+
 mongoose.connect(mongoURI)
-  .then(() => console.log('✅ MongoDB Connected Successfully (Compass Local)'))
+  .then(() => console.log('✅ MongoDB Connected Successfully'))
   .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
 const PORT = process.env.PORT || 5000;
