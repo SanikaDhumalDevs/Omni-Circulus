@@ -8,7 +8,7 @@ import jsPDF from 'jspdf';
 import ReplayModal from './components/ReplayModal'; 
 
 // --- CONFIGURATION: LOCALHOST ---
-const API_BASE_URL = 'http://localhost:5000'; 
+const API_BASE_URL = 'https://omni-circulus.onrender.com'; 
 
 // --- MODALS ---
 
