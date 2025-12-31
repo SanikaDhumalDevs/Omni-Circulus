@@ -18,16 +18,20 @@ const replayRoute = require('./routes/replay');
 
 const app = express();
 
-// --- ⚠️ CRITICAL FIX FOR IMAGES: INCREASE PAYLOAD LIMIT ---
+// --- 🔥 CORS FIX: MUST BE AT THE VERY TOP (BEFORE EVERYTHING ELSE) ---
+app.use(cors({
+    origin: '*',  // Allow ALL devices (Mobile, Laptop, Vercel)
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
+    credentials: true // Allow cookies/headers to pass through
+}));
+
+// Handle preflight requests for all routes explicitly
+app.options('*', cors());
+
+// --- ⚠️ PAYLOAD LIMITS (Now placed AFTER Cors) ---
 app.use(express.json({ limit: '50mb' })); 
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
-// --- ✅ FIX FOR MOBILE & VERCEL CONNECTION (CORS) ---
-app.use(cors({
-    origin: '*',  // This allows ALL devices (Mobile, Laptop, Vercel)
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
 
 // --- 🚚 VIRTUAL LOGISTICS FLEET ---
 const VIRTUAL_FLEET = [
