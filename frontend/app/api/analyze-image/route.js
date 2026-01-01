@@ -3,20 +3,38 @@ import { NextResponse } from "next/server";
 
 export async function POST(req) {
   try {
+    // 1. Get API Key
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json({ error: "API Key Missing" }, { status: 500 });
+      console.error("❌ Error: GEMINI_API_KEY is missing in environment variables");
+      return NextResponse.json({ error: "Server Configuration Error: API Key Missing" }, { status: 500 });
     }
 
-    const { image } = await req.json();
+    // 2. Parse Body
+    const body = await req.json();
+    const { image } = body;
+    
     if (!image) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
     }
 
+    // 3. Detect MimeType (Handle PNG/JPEG dynamically)
+    let mimeType = "image/jpeg";
+    if (image.startsWith("data:")) {
+        const matches = image.match(/^data:(.+);base64,/);
+        if (matches && matches[1]) {
+            mimeType = matches[1];
+        }
+    }
+
+    // 4. Clean Base64 Data
+    const base64Data = image.includes("base64,") ? image.split("base64,")[1] : image;
+
+    // 5. Initialize Gemini
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
-    // --- STRICT VALIDATION PROMPT ---
+    // 6. Define Strict Prompt
     const prompt = `
       You are an Industrial Resource Scanner AI.
       Analyze this image.
@@ -42,23 +60,31 @@ export async function POST(req) {
       Return ONLY JSON. Do not include markdown code blocks.
     `;
 
-    const base64Data = image.includes("base64,") ? image.split("base64,")[1] : image;
-    
+    // 7. Generate Content
     const result = await model.generateContent([
       prompt,
-      { inlineData: { data: base64Data, mimeType: "image/jpeg" } }
+      { inlineData: { data: base64Data, mimeType: mimeType } }
     ]);
 
     const response = await result.response;
     const text = response.text();
+    
+    // 8. Clean JSON String (Remove markdown if present)
     const cleanText = text.replace(/```json/g, "").replace(/```/g, "").trim();
     
-    const data = JSON.parse(cleanText);
+    let data;
+    try {
+      data = JSON.parse(cleanText);
+    } catch (parseError) {
+      console.error("JSON Parse Error:", parseError);
+      console.error("Raw Text received:", text);
+      return NextResponse.json({ error: "AI analysis returned invalid format" }, { status: 500 });
+    }
     
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error("AI Error:", error);
-    return NextResponse.json({ error: "AI Scan Failed" }, { status: 500 });
+    console.error("AI Route Error:", error);
+    return NextResponse.json({ error: "AI Analysis Failed: " + error.message }, { status: 500 });
   }
 }
