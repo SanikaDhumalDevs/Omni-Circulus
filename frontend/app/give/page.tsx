@@ -125,7 +125,7 @@ export default function GivePage() {
     setAnalyzing(true);
     try {
       // ✅ FIXED: Points to Render Backend Route
-      const response = await fetch(`${API_BASE_URL}/api/agent/analyze`, {
+      const response = await fetch(`${API_BASE_URL}/api/give/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64Image }),
