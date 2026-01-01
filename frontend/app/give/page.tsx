@@ -6,11 +6,11 @@ export default function GivePage() {
   const router = useRouter();
   
   // --- ✅ BACKEND CONNECTION ---
+  // Ensure this URL is correct. If running locally, use 'http://localhost:5000'
   const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
 
   // User State for Authentication
   const [user, setUser] = useState(null);
-
   const [loading, setLoading] = useState(false); // For form submission
   const [analyzing, setAnalyzing] = useState(false); // For AI Agent
   const [locating, setLocating] = useState(false); // For GPS Location
@@ -57,7 +57,6 @@ export default function GivePage() {
         const { latitude, longitude } = position.coords;
         
         try {
-          // Reverse Geocoding
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
           );
@@ -66,11 +65,7 @@ export default function GivePage() {
           if (data.address) {
             const { road, house_number, suburb, city, town, village, county, state, postcode } = data.address;
             const mainLocality = city || town || village || county || '';
-            
-            const parts = [
-              house_number, road, suburb, mainLocality, state, postcode
-            ].filter(Boolean); 
-            
+            const parts = [house_number, road, suburb, mainLocality, state, postcode].filter(Boolean); 
             const formattedAddress = parts.join(', ');
             setFormData((prev) => ({ ...prev, location: formattedAddress }));
           } else {
@@ -87,8 +82,6 @@ export default function GivePage() {
 
     const error = (err) => {
         setLocating(false);
-        console.warn(`GPS Error (${err.code}): ${err.message}`);
-        
         let errorMessage = "Unable to retrieve location.";
         switch(err.code) {
             case 1: errorMessage = "⚠️ Location permission denied."; break;
@@ -120,25 +113,32 @@ export default function GivePage() {
     reader.readAsDataURL(file);
   };
 
-  // --- 🔥 UPDATED AI AGENT FUNCTION (Calls Render Backend) ---
+  // --- 🔥 FIXED AI AGENT FUNCTION ---
   const analyzeImageWithAI = async (base64Image) => {
     setAnalyzing(true);
     try {
-      // ✅ FIXED: Points to Render Backend Route
-      const response = await fetch(`${API_BASE_URL}/api/give/analyze`, {
+      console.log("📡 Connecting to Agent...");
+      
+      const response = await fetch(`${API_BASE_URL}/api/agent/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64Image }),
       });
 
-      const data = await response.json();
+      // 1. Get raw text first to prevent JSON crash on HTML errors
+      const responseText = await response.text();
 
+      // 2. Check if server returned an error code
       if (!response.ok) {
-        throw new Error(data.error || 'Agent failed to respond');
+        console.error("Server Error:", responseText);
+        throw new Error(`Server responded with ${response.status}: ${responseText.slice(0, 100)}`);
       }
 
+      // 3. Parse JSON safely
+      const data = JSON.parse(responseText);
+
       if (data.valid === false) {
-          alert(`🚫 INVALID RESOURCE DETECTED\n\nSystem Analysis: ${data.reason}\n\nProtocol Violation: This platform is for Industrial/Construction resources only.`);
+          alert(`🚫 INVALID RESOURCE DETECTED\n\nReason: ${data.reason}`);
           setImagePreview(null);
           setFormData(prev => ({...prev, title: '', type: 'Wood', description: ''}));
           setAnalyzing(false);
@@ -154,8 +154,8 @@ export default function GivePage() {
       
     } catch (error) {
       console.error("AI Error:", error);
-      alert(`⚠️ AI Analysis failed. Please enter details manually.`);
-      setFormData(prev => ({...prev, title: "Scanned Item", description: " AI Analysis Failed. Please describe manually."}));
+      alert(`⚠️ AI Analysis failed. Please fill details manually.\nError: ${error.message}`);
+      setFormData(prev => ({...prev, title: "Scanned Item", description: "Manual entry required."}));
     } finally {
       setAnalyzing(false);
     }
@@ -193,7 +193,6 @@ export default function GivePage() {
     }
 
     try {
-      // --- ✅ FIXED: USING RENDER URL ---
       const response = await fetch(`${API_BASE_URL}/api/resources/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -204,7 +203,8 @@ export default function GivePage() {
         alert('✅ Resource Successfully Logged into Network');
         router.push('/'); 
       } else {
-        alert('❌ Error logging resource to database.');
+        const errorText = await response.text();
+        alert(`❌ Error logging resource: ${errorText}`);
       }
     } catch (error) {
       console.error('Network Error:', error);
