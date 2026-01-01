@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 export default function GivePage() {
   const router = useRouter();
   
-  // --- ✅ DEFINE BACKEND URL HERE ---
+  // --- ✅ BACKEND CONNECTION ---
   const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
 
   // User State for Authentication
@@ -120,13 +120,12 @@ export default function GivePage() {
     reader.readAsDataURL(file);
   };
 
-  // The AI Agent Function
+  // --- 🔥 UPDATED AI AGENT FUNCTION (Calls Render Backend) ---
   const analyzeImageWithAI = async (base64Image) => {
     setAnalyzing(true);
     try {
-      // NOTE: This assumes you have a Next.js API route at app/api/analyze-image/route.ts
-      // If this fails, we will need to move AI logic to the backend server.
-      const response = await fetch('/api/analyze-image', {
+      // ✅ FIXED: Points to Render Backend Route
+      const response = await fetch(`${API_BASE_URL}/api/agent/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: base64Image }),
@@ -166,7 +165,7 @@ export default function GivePage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // --- UPDATED SUBMIT FUNCTION ---
+  // --- SUBMIT FUNCTION ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -194,7 +193,7 @@ export default function GivePage() {
     }
 
     try {
-      // --- ✅ FIXED: USING RENDER URL INSTEAD OF LOCALHOST ---
+      // --- ✅ FIXED: USING RENDER URL ---
       const response = await fetch(`${API_BASE_URL}/api/resources/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
