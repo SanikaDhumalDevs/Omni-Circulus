@@ -28,7 +28,7 @@ export default function AuthPage() {
 
     // 1. Decide which endpoint to hit (Login or Register)
     const endpoint = isLogin ? 'login' : 'register';
-    const url = `https://omni-backend-final.onrender.com/api/auth/${endpoint}`;
+    const url = `https://omni-circulus-backend.onrender.com/api/auth/${endpoint}`;
 
     try {
       const res = await fetch(url, {
