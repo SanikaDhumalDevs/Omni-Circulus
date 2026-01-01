@@ -34,6 +34,9 @@ const Typewriter = ({ text, speed = 20 }: { text: string, speed?: number }) => {
 export default function AgentPage() {
   const router = useRouter();
   
+  // --- ✅ FIXED: BACKEND CONNECTION URL ---
+  const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
+
   const [user, setUser] = useState<any>(null);
   const [prompt, setPrompt] = useState('');
   
@@ -68,7 +71,6 @@ export default function AgentPage() {
   const logsEndRef = useRef<HTMLDivElement>(null); 
   
   // --- AUTO-SEND TRACKER ---
-  // Prevents the auto-email function from firing multiple times for the same step
   const emailSentRef = useRef(false);
 
   // 1. Load User & Fetch History
@@ -92,7 +94,6 @@ export default function AgentPage() {
     const { status, logs } = negotiation;
     const lastLog = logs && logs.length > 0 ? logs[logs.length - 1] : null;
     
-    // Logic to determine what to show in the Footer
     if (status === 'CANCELLED_DISTANCE' || status === 'FAILED') { 
         setUiPhase('CANCELLED'); 
     }
@@ -114,14 +115,12 @@ export default function AgentPage() {
     }
   }, [negotiation, showNegotiation, isTyping]);
 
-  // 3. --- AUTO-TRIGGER EMAIL LOGIC (NEW) ---
+  // 3. --- AUTO-TRIGGER EMAIL LOGIC ---
   useEffect(() => {
-    // If we reached agreement AND haven't sent emails yet
     if (negotiation?.status === 'TRANSPORT_AGREED' && !emailSentRef.current) {
         console.log("🤖 Agent Auto-Dispatching Emails...");
-        emailSentRef.current = true; // Lock it so it doesn't fire twice
+        emailSentRef.current = true; 
         
-        // Slight delay for UX (so user sees the bill briefly)
         setTimeout(() => {
             handleRequestApproval();
         }, 1500);
@@ -143,7 +142,6 @@ export default function AgentPage() {
     const processNextTurn = async () => {
       if (!negotiation) return;
       
-      // Stop loop if completed, failed, or waiting for email approval
       if (['COMPLETED', 'FAILED', 'DEAL_CLOSED', 'CANCELLED_DISTANCE', 'WAITING_FOR_APPROVAL'].includes(negotiation.status)) {
         setIsTyping(false);
         return;
@@ -165,7 +163,8 @@ export default function AgentPage() {
 
       timeoutId = setTimeout(async () => {
         try {
-          const res = await fetch('http://localhost:5000/api/negotiate/next-turn', {
+          // ✅ FIXED URL
+          const res = await fetch(`${API_BASE_URL}/api/negotiate/next-turn`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ negotiationId: negotiation._id })
@@ -202,7 +201,8 @@ export default function AgentPage() {
   // --- API CALLS ---
   const fetchBackgroundAgents = async (email: string) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/agent/my-requests/${email}`);
+      // ✅ FIXED URL
+      const res = await fetch(`${API_BASE_URL}/api/agent/my-requests/${email}`);
       const data = await res.json();
       if (Array.isArray(data)) setActiveRequests(data.filter(r => r.status !== 'COMPLETED'));
     } catch (e) { console.error(e); }
@@ -210,7 +210,8 @@ export default function AgentPage() {
 
   const fetchHistory = async (email: string) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/negotiate/history/${email}`);
+      // ✅ FIXED URL
+      const res = await fetch(`${API_BASE_URL}/api/negotiate/history/${email}`);
       const data = await res.json();
       setHistory(data);
     } catch (e) { console.error("History Error", e); }
@@ -221,7 +222,8 @@ export default function AgentPage() {
     setIsActive(true); setFoundDeals([]); setLogs([]); setNegotiation(null);
     setLogs(prev => [...prev, `> REQUEST: "${prompt}"`]);
     try {
-      const res = await fetch('http://localhost:5000/api/agent/seek', {
+      // ✅ FIXED URL
+      const res = await fetch(`${API_BASE_URL}/api/agent/seek`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, userEmail: user.email }) 
@@ -247,12 +249,12 @@ export default function AgentPage() {
     const rId = item._id || item; 
     if (!buyerLocation && !confirm("Start without GPS? (Logistics will use estimates)")) return;
     
-    // RESET FOR NEW DEAL
     emailSentRef.current = false; 
 
     setShowNegotiation(true); setNegotiation(null); setUiPhase('PRICE'); 
     try {
-      const res = await fetch('http://localhost:5000/api/negotiate/start', {
+      // ✅ FIXED URL
+      const res = await fetch(`${API_BASE_URL}/api/negotiate/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resourceId: rId, buyerEmail: user.email, buyerLocation: buyerLocation || "Unknown" })
@@ -266,7 +268,8 @@ export default function AgentPage() {
   const handleRequestApproval = async () => {
     if (!negotiation) return;
     try {
-        const res = await fetch('http://localhost:5000/api/negotiate/send-approvals', {
+        // ✅ FIXED URL
+        const res = await fetch(`${API_BASE_URL}/api/negotiate/send-approvals`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ negotiationId: negotiation._id })
@@ -274,11 +277,10 @@ export default function AgentPage() {
         const data = await res.json();
         
         if (res.ok) {
-            // Auto-success: No alert needed, just state update
            setNegotiation((prev: any) => ({ ...prev, status: 'WAITING_FOR_APPROVAL' }));
         } else {
             alert("❌ Agent Failed to dispatch emails: " + (data.error || "Unknown Error"));
-            emailSentRef.current = false; // Allow retry if failed
+            emailSentRef.current = false; 
         }
     } catch(e) { 
         alert("Network Error during Dispatch");
