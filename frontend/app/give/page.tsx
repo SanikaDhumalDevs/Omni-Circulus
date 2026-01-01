@@ -5,6 +5,9 @@ import { useRouter } from 'next/navigation';
 export default function GivePage() {
   const router = useRouter();
   
+  // --- ✅ DEFINE BACKEND URL HERE ---
+  const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
+
   // User State for Authentication
   const [user, setUser] = useState(null);
 
@@ -35,7 +38,7 @@ export default function GivePage() {
     }
   }, []);
 
-  // --- FIXED GPS LOCATION HANDLER ---
+  // --- GPS LOCATION HANDLER ---
   const handleLocationClick = () => {
     if (!navigator.geolocation) {
       alert("⚠️ Geolocation is not supported by your browser");
@@ -45,16 +48,16 @@ export default function GivePage() {
     setLocating(true);
 
     const options = {
-      enableHighAccuracy: true, // Try for best accuracy
-      timeout: 10000,           // Wait 10 seconds max
-      maximumAge: 0             // Don't use cached position
+      enableHighAccuracy: true, 
+      timeout: 10000,           
+      maximumAge: 0             
     };
 
     const success = async (position) => {
         const { latitude, longitude } = position.coords;
         
         try {
-          // Reverse Geocoding to get address name
+          // Reverse Geocoding
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
           );
@@ -87,17 +90,10 @@ export default function GivePage() {
         console.warn(`GPS Error (${err.code}): ${err.message}`);
         
         let errorMessage = "Unable to retrieve location.";
-        
         switch(err.code) {
-            case 1: // PERMISSION_DENIED
-                errorMessage = "⚠️ Location permission denied. Please allow access in browser settings.";
-                break;
-            case 2: // POSITION_UNAVAILABLE
-                errorMessage = "⚠️ Location unavailable. Check your GPS signal.";
-                break;
-            case 3: // TIMEOUT
-                errorMessage = "⚠️ Request timed out. Please try again.";
-                break;
+            case 1: errorMessage = "⚠️ Location permission denied."; break;
+            case 2: errorMessage = "⚠️ Location unavailable."; break;
+            case 3: errorMessage = "⚠️ Request timed out."; break;
         }
         alert(errorMessage);
     };
@@ -128,6 +124,8 @@ export default function GivePage() {
   const analyzeImageWithAI = async (base64Image) => {
     setAnalyzing(true);
     try {
+      // NOTE: This assumes you have a Next.js API route at app/api/analyze-image/route.ts
+      // If this fails, we will need to move AI logic to the backend server.
       const response = await fetch('/api/analyze-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -140,7 +138,6 @@ export default function GivePage() {
         throw new Error(data.error || 'Agent failed to respond');
       }
 
-      // Validation Check
       if (data.valid === false) {
           alert(`🚫 INVALID RESOURCE DETECTED\n\nSystem Analysis: ${data.reason}\n\nProtocol Violation: This platform is for Industrial/Construction resources only.`);
           setImagePreview(null);
@@ -180,30 +177,28 @@ export default function GivePage() {
         return;
     }
 
-    // Basic Validation for Price
     if (!formData.cost || formData.cost <= 0) {
         alert("Please enter a valid estimated price.");
         setLoading(false);
         return;
     }
 
-    // Prepare the data object
     const resourceData = { 
         ...formData,
         cost: Number(formData.cost), 
         ownerEmail: user.email 
     };
 
-    // LOGIC: Check if imagePreview exists. If yes, add it to payload.
     if (imagePreview) {
         resourceData.imageUrl = imagePreview;
     }
 
     try {
-      const response = await fetch('http://localhost:5000/api/resources/add', {
+      // --- ✅ FIXED: USING RENDER URL INSTEAD OF LOCALHOST ---
+      const response = await fetch(`${API_BASE_URL}/api/resources/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(resourceData), // Send the prepared data
+        body: JSON.stringify(resourceData),
       });
 
       if (response.ok) {
@@ -224,11 +219,9 @@ export default function GivePage() {
 
   return (
     <main className="min-h-screen w-full bg-[#020617] text-white flex items-center justify-center p-4">
-      
       <div className="fixed inset-0 z-0 opacity-20 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
 
       <div className="relative z-10 w-full max-w-lg bg-slate-900/50 backdrop-blur-xl border border-white/10 p-8 rounded-3xl shadow-2xl">
-        
         <div className="mb-8 text-center">
           <h2 className="text-2xl font-bold tracking-wider text-white">UPLOAD RESOURCE</h2>
           <p className="text-slate-400 text-xs uppercase tracking-[0.2em] mt-2">
@@ -237,7 +230,6 @@ export default function GivePage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          
           {/* AI IMAGE UPLOADER */}
           <div className="border-2 border-dashed border-slate-700 rounded-xl p-4 text-center hover:border-cyan-500 transition-colors relative group">
             <input 
@@ -375,7 +367,6 @@ export default function GivePage() {
             {loading ? 'PROCESSING...' : 'INITIALIZE AGENT'}
           </button>
         </form>
-
       </div>
     </main>
   );
