@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
-// --- IMPORT MODELS TO ENSURE THEY ARE REGISTERED ---
+// --- IMPORT MODELS ---
 require('./models/Resource'); 
 require('./models/Negotiation');
 require('./models/Request');
@@ -18,22 +18,22 @@ const replayRoute = require('./routes/replay');
 
 const app = express();
 
-// --- 🔥 CORS FIX: MUST BE AT THE VERY TOP (BEFORE EVERYTHING ELSE) ---
+// --- 🔥 CORS FIX: MUST BE AT THE VERY TOP ---
 app.use(cors({
-    origin: '*',  // Allow ALL devices (Mobile, Laptop, Vercel)
+    origin: '*',  
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
-    credentials: true // Allow cookies/headers to pass through
+    credentials: true
 }));
 
-// Handle preflight requests for all routes explicitly
-app.options('*', cors());
+// --- 🚨 CRITICAL FIX FOR EXPRESS 5: USE (.*) INSTEAD OF * ---
+app.options('(.*)', cors());
 
-// --- ⚠️ PAYLOAD LIMITS (Now placed AFTER Cors) ---
+// --- PAYLOAD LIMITS ---
 app.use(express.json({ limit: '50mb' })); 
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// --- 🚚 VIRTUAL LOGISTICS FLEET ---
+// --- VIRTUAL LOGISTICS FLEET ---
 const VIRTUAL_FLEET = [
   { name: "Rajesh Kumar", truck: "Tata Signa 4018", plate: "MH-12-AB-9988", phone: "+91-98765-43210" },
   { name: "Vikram Singh", truck: "Ashok Leyland Ecomet", plate: "DL-01-CA-4421", phone: "+91-99887-77665" },
@@ -41,40 +41,28 @@ const VIRTUAL_FLEET = [
   { name: "Amit Verma", truck: "Mahindra Blazo X", plate: "UP-32-DN-5566", phone: "+91-77665-54433" }
 ];
 
-// --- 💰 CUSTOM ESCROW ROUTES ---
+// --- CUSTOM ESCROW ROUTES ---
 
-// 1. PAYMENT & MONEY SPLIT ENDPOINT
 app.post('/api/transaction/pay', async (req, res) => {
   try {
     const { negotiationId } = req.body;
     console.log(`💳 Processing Payment for Order: ${negotiationId}`);
-
-    // Simulate Bank Delay
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // A. Pick a Random Driver
     const driver = VIRTUAL_FLEET[Math.floor(Math.random() * VIRTUAL_FLEET.length)];
-    
-    // B. Generate Gate Pass ID
     const gatePassId = "GP-" + Math.floor(100000 + Math.random() * 900000);
 
     const Negotiation = mongoose.model('Negotiation');
     const Resource = mongoose.model('Resource');
 
-    // D. Fetch Current Deal
     const currentDeal = await Negotiation.findById(negotiationId);
     if (!currentDeal) return res.status(404).json({ error: "Deal not found" });
 
-    // --- 💰 MONEY SPLIT LOGIC ---
-    const sellerShare = currentDeal.finalPrice;       
-    const driverShare = currentDeal.transportCost;    
-
-    // E. Update Database
     const updatedDeal = await Negotiation.findByIdAndUpdate(negotiationId, {
       status: 'PAID', 
       paymentStatus: 'COMPLETED',
-      sellerPayout: sellerShare, 
-      driverFee: driverShare,    
+      sellerPayout: currentDeal.finalPrice, 
+      driverFee: currentDeal.transportCost,    
       logistics: {
         driverName: driver.name,
         truckNumber: driver.truck,
@@ -85,30 +73,24 @@ app.post('/api/transaction/pay', async (req, res) => {
       }
     }, { new: true });
 
-    // F. Mark Resource as SOLD
     if(updatedDeal && updatedDeal.resourceId) {
       await Resource.findByIdAndUpdate(updatedDeal.resourceId, { status: 'SOLD' });
     }
 
     res.json({ success: true, deal: updatedDeal });
-
   } catch (err) {
     console.error("Payment Error:", err);
     res.status(500).json({ error: "Payment Gateway Failed" });
   }
 });
 
-// 2. DASHBOARD OVERRIDE 
 app.get('/api/dashboard/stats', async (req, res) => {
   try {
     const { email } = req.query;
     const Negotiation = mongoose.model('Negotiation');
     const Resource = mongoose.model('Resource');
 
-    // 1. Inventory
     const inventory = await Resource.find({ ownerEmail: email }); 
-    
-    // 2. Buying (Incoming)
     const buying = await Negotiation.find({ 
       buyerEmail: email,
       status: { $in: ['APPROVED', 'PAID', 'COMPLETED'] } 
@@ -125,7 +107,6 @@ app.get('/api/dashboard/stats', async (req, res) => {
       logistics: n.logistics || {} 
     }));
 
-    // 3. Selling (Outgoing)
     const selling = await Negotiation.find({ 
       sellerEmail: email,
       status: { $in: ['APPROVED', 'PAID', 'COMPLETED'] } 
@@ -142,7 +123,6 @@ app.get('/api/dashboard/stats', async (req, res) => {
       logistics: n.logistics || {}
     }));
 
-    // Stats
     const soldItems = await Negotiation.find({ sellerEmail: email, status: { $in: ['PAID', 'COMPLETED'] } });
     const revenue = soldItems.reduce((acc, item) => acc + (item.finalPrice || 0), 0);
     const spend = buying.reduce((acc, item) => acc + (item.totalValue || 0), 0);
