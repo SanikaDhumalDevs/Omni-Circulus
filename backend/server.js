@@ -26,8 +26,9 @@ app.use(cors({
     credentials: true
 }));
 
-// --- 🚨 CRITICAL FIX FOR EXPRESS 5: USE (.*) INSTEAD OF * ---
-app.options('(.*)', cors());
+// --- 🚨 CRITICAL FIX FOR EXPRESS 5: USE REGEX INSTEAD OF STRING ---
+// The old way ('*') crashes Express 5. This new way (/.*/) works perfectly.
+app.options(/.*/, cors());
 
 // --- PAYLOAD LIMITS ---
 app.use(express.json({ limit: '50mb' })); 
