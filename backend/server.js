@@ -18,17 +18,21 @@ const replayRoute = require('./routes/replay');
 
 const app = express();
 
-// --- 🔥 CORS FIX: MUST BE AT THE VERY TOP ---
-app.use(cors({
-    origin: '*',  
+// --- 🔥 FINAL CORS FIX (Smart Allow) ---
+// We changed origin: '*' to origin: true.
+// This is required when credentials: true is set.
+const corsOptions = {
+    origin: true, 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],
     credentials: true
-}));
+};
 
-// --- 🚨 CRITICAL FIX FOR EXPRESS 5: USE REGEX INSTEAD OF STRING ---
-// The old way ('*') crashes Express 5. This new way (/.*/) works perfectly.
-app.options(/.*/, cors());
+app.use(cors(corsOptions));
+
+// --- 🚨 PREFLIGHT FIX FOR EXPRESS 5 ---
+// Use the same options for preflight requests
+app.options(/.*/, cors(corsOptions));
 
 // --- PAYLOAD LIMITS ---
 app.use(express.json({ limit: '50mb' })); 
