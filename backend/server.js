@@ -18,7 +18,9 @@ const replayRoute = require('./routes/replay');
 
 const app = express();
 
-// --- 🔥 FINAL CORS FIX ---
+// --- 🔥 FINAL CORS FIX (Smart Allow) ---
+// We changed origin: '*' to origin: true.
+// This is required when credentials: true is set.
 const corsOptions = {
     origin: true, 
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -27,7 +29,10 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Enable preflight for all routes
+
+// --- 🚨 PREFLIGHT FIX FOR EXPRESS 5 ---
+// Use the same options for preflight requests
+app.options(/.*/, cors(corsOptions));
 
 // --- PAYLOAD LIMITS ---
 app.use(express.json({ limit: '50mb' })); 
@@ -42,6 +47,7 @@ const VIRTUAL_FLEET = [
 ];
 
 // --- CUSTOM ESCROW ROUTES ---
+
 app.post('/api/transaction/pay', async (req, res) => {
   try {
     const { negotiationId } = req.body;
@@ -138,24 +144,14 @@ app.get('/api/dashboard/stats', async (req, res) => {
   }
 });
 
-// --- ROUTES ---
+// --- EXISTING ROUTES ---
 app.use('/api/gate', gateRoute);
 app.use('/api/resources', resourceRoutes);
-
-// ✅ Ensure your agentRoutes.js exports a Router that has .post('/analyze', ...)
 app.use('/api/agent', agentRoutes);
-
 app.use('/api/negotiate', negotiationRoute);
 app.use('/api/dashboard', dashboardRoute); 
 app.use('/api/auth', authRoute);
 app.use('/api/replay', replayRoute); 
-
-// --- 🚨 GLOBAL 404 HANDLER (KEEPS FRONTEND FROM CRASHING) ---
-// This ensures we always send JSON, even if the route doesn't exist.
-app.use((req, res) => {
-    console.log(`❌ 404 Not Found: ${req.method} ${req.originalUrl}`);
-    res.status(404).json({ error: "API Route Not Found", path: req.originalUrl });
-});
 
 // --- CONNECT TO DATABASE ---
 const mongoURI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/omni-circulus';
