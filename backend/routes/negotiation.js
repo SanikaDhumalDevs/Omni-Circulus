@@ -5,9 +5,7 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer'); 
 require('dotenv').config();
 
-// --- 📧 EMAIL CONFIGURATION (UPDATED) ---
-// ✅ FIX: Removed spaces from the App Password. 
-// Google App Passwords must be used without spaces in code.
+// --- 📧 EMAIL CONFIGURATION ---
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
@@ -21,11 +19,9 @@ const transporter = nodemailer.createTransport({
 // --- 📧 INTERNAL EMAIL SENDER FUNCTION ---
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
   try {
-    // ✅ SAFETY CHECK: Ensure emails exist before sending
-    if (!negotiation.buyerEmail || !negotiation.sellerEmail) {
-        console.error("❌ Email Error: Missing Buyer or Seller Email in Negotiation object.");
-        return false;
-    }
+    console.log("📧 Attempting to send emails...");
+    console.log(`   Buyer: ${negotiation.buyerEmail}`);
+    console.log(`   Seller: ${negotiation.sellerEmail}`);
 
     const itemTitle = negotiation.resourceId?.title || "Resource";
     
@@ -56,10 +52,10 @@ const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
       `
     });
 
-    console.log(`✅ Emails sent successfully to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
+    console.log(`✅ Emails sent successfully.`);
     return true;
   } catch (error) {
-    console.error("❌ Email Error:", error);
+    console.error("❌ Email System Error:", error);
     return false;
   }
 };
@@ -85,7 +81,6 @@ router.post('/start', async (req, res) => {
     try {
         const { resourceId, buyerEmail, buyerLocation } = req.body;
         
-        // Load Models inside route to ensure they are registered
         const Resource = mongoose.model('Resource');
         const Negotiation = mongoose.model('Negotiation');
         
@@ -95,9 +90,7 @@ router.post('/start', async (req, res) => {
         await Negotiation.deleteMany({ resourceId, buyerEmail, status: { $ne: 'DEAL_CLOSED' } });
 
         const floorPrice = Math.floor(resource.cost * 0.9); 
-
-        // ✅ Fallback if ownerEmail is missing in DB
-        const sellerEmail = resource.ownerEmail || process.env.ADMIN_EMAIL || 'sanikadhumal149@gmail.com';
+        const sellerEmail = resource.ownerEmail || 'sanikadhumal149@gmail.com';
 
         const negotiation = new Negotiation({
             resourceId,
@@ -126,7 +119,7 @@ router.post('/start', async (req, res) => {
 router.post('/next-turn', async (req, res) => {
     try {
         const { negotiationId } = req.body;
-        const Negotiation = mongoose.model('Negotiation'); // Safe Load
+        const Negotiation = mongoose.model('Negotiation');
 
         const negotiation = await Negotiation.findById(negotiationId);
         if (!negotiation) return res.status(404).json({ error: "Negotiation lost" });
@@ -279,29 +272,32 @@ router.post('/next-turn', async (req, res) => {
     }
 });
 
-// --- 5. SEND APPROVALS (FIXED) ---
+// --- 5. SEND APPROVALS (AUTO-REPAIR FIX) ---
 router.post('/send-approvals', async (req, res) => {
     try {
         const { negotiationId } = req.body;
-        const Negotiation = mongoose.model('Negotiation'); // Safe Load
+        const Negotiation = mongoose.model('Negotiation'); 
         
         const negotiation = await Negotiation.findById(negotiationId).populate('resourceId');
         
         if (!negotiation) return res.status(404).json({ error: "Negotiation not found" });
 
+        // 🔥 AUTO-REPAIR: If Seller Email is missing, use default
+        if (!negotiation.sellerEmail) {
+            console.log("⚠️ Missing Seller Email. Fixing it now...");
+            negotiation.sellerEmail = 'sanikadhumal149@gmail.com'; 
+            await negotiation.save();
+        }
+
         const token = crypto.randomBytes(20).toString('hex');
         negotiation.confirmationToken = token;
         negotiation.status = 'WAITING_FOR_APPROVAL';
 
-        // ✅ URL Config
-        // Ideally this should point to your Frontend, not Backend.
-        // But for now, ensuring the email sends is the priority.
         const baseUrl = 'https://omni-circulus-backend.onrender.com'; 
         
         const buyerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=buyer`;
         const sellerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=seller`;
 
-        // Using internal function
         const emailSent = await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
 
         if (emailSent) {
@@ -309,13 +305,14 @@ router.post('/send-approvals', async (req, res) => {
             await negotiation.save();
             res.json({ success: true, message: "Emails Sent" });
         } else {
-            // Revert status if email fails so user can try again
-            negotiation.status = 'TRANSPORT_AGREED'; 
+            // If email fails, don't crash, just report it
+            console.error("❌ Email failed to send despite fixes.");
+            negotiation.status = 'TRANSPORT_AGREED'; // Revert state
             await negotiation.save();
-            res.status(500).json({ error: "Failed to send emails. Please check server logs." });
+            res.status(500).json({ error: "Email could not be sent. Check backend logs." });
         }
     } catch (err) {
-        console.error("Approval Error:", err);
+        console.error("Server Crash in Send-Approvals:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -324,7 +321,7 @@ router.post('/send-approvals', async (req, res) => {
 router.post('/verify-transaction', async (req, res) => {
     try {
         const { token, action, role } = req.body; 
-        const Negotiation = mongoose.model('Negotiation'); // Safe Load
+        const Negotiation = mongoose.model('Negotiation'); 
 
         const negotiation = await Negotiation.findOne({ confirmationToken: token });
         if (!negotiation) return res.status(404).json({ error: "Invalid Token" });
@@ -362,7 +359,7 @@ router.post('/verify-transaction', async (req, res) => {
 router.post('/confirm', async (req, res) => {
     try {
         const { negotiationId } = req.body;
-        const Negotiation = mongoose.model('Negotiation'); // Safe Load
+        const Negotiation = mongoose.model('Negotiation'); 
         const Resource = mongoose.model('Resource');
         const Request = mongoose.model('Request');
 
@@ -388,7 +385,7 @@ router.post('/confirm', async (req, res) => {
 router.get('/history/:email', async (req, res) => {
     try {
         const { email } = req.params;
-        const Negotiation = mongoose.model('Negotiation'); // Safe Load
+        const Negotiation = mongoose.model('Negotiation'); 
 
         const history = await Negotiation.find({ 
             buyerEmail: email, 
