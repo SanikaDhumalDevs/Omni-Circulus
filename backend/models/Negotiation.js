@@ -75,4 +75,7 @@ const NegotiationSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('Negotiation', NegotiationSchema);
+// ✅ SAFE EXPORT FIX
+// This checks if the model exists before compiling it again.
+// This prevents the "OverwriteModelError" that causes 500 crashes.
+module.exports = mongoose.models.Negotiation || mongoose.model('Negotiation', NegotiationSchema);
