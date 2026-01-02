@@ -5,29 +5,32 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer'); 
 require('dotenv').config();
 
-// --- LOAD MODELS SAFELY ---
+// --- 🛑 FIX: LOAD MODELS SAFELY ---
+// We use mongoose.model() to get the models that are already registered.
+// This prevents the "OverwriteModelError" that causes the 500 crash on Render.
 const Negotiation = mongoose.model('Negotiation');
 const Resource = mongoose.model('Resource');
 const Request = mongoose.model('Request');
 
 // --- 📧 EMAIL CONFIGURATION ---
+// Using explicit settings for Render/Cloud hosting
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // Use SSL
+  host: 'smtp.gmail.com',  
+  port: 465,               
+  secure: true,            
   auth: {
     user: 'sanikadhumal149@gmail.com', 
     pass: 'kavg woqd ovdt srmz' 
   }
 });
 
-// --- 📧 INTERNAL EMAIL SENDER (DEBUG VERSION) ---
+// --- 📧 INTERNAL EMAIL SENDER (DEBUG MODE) ---
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
   try {
-    console.log("📨 Prepare sending emails...");
+    console.log("📨 Attempting to dispatch emails...");
     const itemTitle = negotiation.resourceId?.title || "Resource";
     
-    // 1. Send Buyer Email
+    // 1. Buyer Email
     await transporter.sendMail({
       from: '"Omni Agent" <sanikadhumal149@gmail.com>',
       to: negotiation.buyerEmail,
@@ -41,7 +44,7 @@ const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
       `
     });
 
-    // 2. Send Seller Email
+    // 2. Seller Email
     await transporter.sendMail({
       from: '"Omni Agent" <sanikadhumal149@gmail.com>',
       to: negotiation.sellerEmail,
@@ -54,17 +57,17 @@ const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
       `
     });
 
-    console.log("✅ Emails Sent Successfully");
+    console.log(`✅ Emails sent successfully.`);
     return { success: true };
 
   } catch (error) {
     console.error("❌ CRITICAL EMAIL ERROR:", error);
-    // Return the actual error message so we can see it in the browser
+    // 🚨 RETURN THE ACTUAL ERROR MESSAGE SO WE CAN SEE IT
     return { success: false, error: error.message };
   }
 };
 
-// --- 1. SAFE AI LOADER ---
+// --- 1. SAFE AI LOADER (YOUR ORIGINAL LOGIC) ---
 let GoogleGenerativeAI;
 try {
     const lib = require("@google/generative-ai");
@@ -73,14 +76,14 @@ try {
     console.warn("⚠️ Google AI Lib missing. Using Simulation Mode.");
 }
 
-// --- 2. HELPER: LOGISTICS ---
+// --- 2. HELPER: LOGISTICS (YOUR ORIGINAL LOGIC) ---
 function calculateLogistics(loc1, loc2) {
     const distance = Math.floor(Math.random() * 30) + 5; 
     const transportCost = distance * 25; 
     return { distance, transportCost };
 }
 
-// --- 3. START NEGOTIATION ---
+// --- 3. START NEGOTIATION (YOUR ORIGINAL LOGIC) ---
 router.post('/start', async (req, res) => {
     try {
         const { resourceId, buyerEmail, buyerLocation } = req.body;
@@ -114,7 +117,7 @@ router.post('/start', async (req, res) => {
     }
 });
 
-// --- 4. NEXT TURN ---
+// --- 4. NEXT TURN (YOUR ORIGINAL LOGIC) ---
 router.post('/next-turn', async (req, res) => {
     try {
         const { negotiationId } = req.body;
@@ -163,9 +166,15 @@ router.post('/next-turn', async (req, res) => {
             if (!process.env.GEMINI_API_KEY || !GoogleGenerativeAI) throw new Error("No AI Config");
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const systemPrompt = `Act as ${currentAgent}. Phase: ${isTransportPhase ? 'Logistics' : 'Price'}. Respond ONLY in JSON: { "action": "OFFER" | "ACCEPT" | "DECLINE", "price": number, "message": "string" } History: ${JSON.stringify(negotiation.logs.slice(-3))}`;
+            const systemPrompt = `
+                Act as ${currentAgent}.
+                Phase: ${isTransportPhase ? 'Logistics' : 'Price'}.
+                Respond ONLY in JSON: { "action": "OFFER" | "ACCEPT" | "DECLINE", "price": number, "message": "string" }
+                History: ${JSON.stringify(negotiation.logs.slice(-3))}
+            `;
             const result = await model.generateContent(systemPrompt);
-            decision = JSON.parse(result.response.text().replace(/```json/g, '').replace(/```/g, '').trim());
+            const text = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+            decision = JSON.parse(text);
         } catch (aiError) {
             const stdCost = negotiation.transportCost || 0;
             if (isTransportPhase) {
@@ -204,18 +213,18 @@ router.post('/next-turn', async (req, res) => {
         await negotiation.save();
         res.json(negotiation);
     } catch (err) {
+        console.error("SERVER ERROR:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- 5. SEND APPROVALS (DEBUGGING ENABLED) ---
+// --- 5. SEND APPROVALS (UPDATED TO SHOW EXACT ERROR) ---
 router.post('/send-approvals', async (req, res) => {
     try {
         const { negotiationId } = req.body;
         console.log(`📡 Sending emails for Negotiation ID: ${negotiationId}`);
 
         const negotiation = await Negotiation.findById(negotiationId).populate('resourceId');
-        
         if (!negotiation) return res.status(404).json({ error: "Negotiation not found" });
 
         const token = crypto.randomBytes(20).toString('hex');
@@ -229,14 +238,13 @@ router.post('/send-approvals', async (req, res) => {
         // CALL EMAIL FUNCTION
         const emailResult = await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
 
-        // CHECK RESULT
         if (emailResult.success) {
             negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
             await negotiation.save();
             res.json({ success: true, message: "Emails Sent" });
         } else {
-            // 🚨 SEND THE REAL ERROR TO THE FRONTEND
-            console.error("❌ Email dispatch failed:", emailResult.error);
+            // 🚨 SEND REAL ERROR TO FRONTEND
+            console.error("❌ Email dispatch returned false.");
             res.status(500).json({ error: "EMAIL FAILED: " + emailResult.error });
         }
     } catch (err) {
@@ -245,7 +253,7 @@ router.post('/send-approvals', async (req, res) => {
     }
 });
 
-// --- 6. VERIFY TRANSACTION ---
+// --- 6. VERIFY TRANSACTION (YOUR ORIGINAL LOGIC) ---
 router.post('/verify-transaction', async (req, res) => {
     try {
         const { token, action, role } = req.body; 
@@ -275,7 +283,7 @@ router.post('/verify-transaction', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- 7. HISTORY ---
+// --- 7. HISTORY (YOUR ORIGINAL LOGIC) ---
 router.get('/history/:email', async (req, res) => {
     try {
         const history = await Negotiation.find({ 
