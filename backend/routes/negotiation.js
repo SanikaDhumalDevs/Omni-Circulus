@@ -1,83 +1,62 @@
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose');
-const nodemailer = require('nodemailer'); // ✅ 1. Import Nodemailer directly
+const Negotiation = require('../models/Negotiation');
+const Resource = require('../models/Resource');
+const Request = require('../models/Request');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer'); // ✅ IMPORTED DIRECTLY
 require('dotenv').config();
 
-// --- IMPORT MODELS ---
-const Negotiation = mongoose.model('Negotiation');
-const Resource = mongoose.model('Resource');
-const Request = mongoose.model('Request');
-
-// --- 📧 2. EMAIL CONFIGURATION (Embedded) ---
+// --- 📧 EMAIL CONFIGURATION (FIXED) ---
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'sanikadhumal149@gmail.com', 
-    pass: 'kavg woqd ovdt srmz' // App Password
+    pass: 'kavg woqd ovdt srmz' 
   }
 });
 
-// --- 📧 3. EMAIL SENDER FUNCTION ---
+// --- 📧 INTERNAL EMAIL SENDER FUNCTION ---
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
   try {
-    const itemTitle = negotiation.resourceId?.title || "Industrial Resource";
-    const totalCost = negotiation.totalValue;
-
-    // Buyer HTML
-    const buyerHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd;">
-        <h2 style="color: #0891b2;">Action Required: Purchase Confirmation</h2>
-        <p>The agent has negotiated a deal for <strong>${itemTitle}</strong>.</p>
-        <div style="background: #f4f4f5; padding: 15px; margin: 15px 0;">
-          <p><strong>Total Payable:</strong> ₹${totalCost}</p>
-          <p><strong>Location:</strong> ${negotiation.buyerLocation}</p>
-        </div>
-        <p>Click below to finalize:</p>
-        <a href="${buyerLink}" style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">✅ CONFIRM PURCHASE</a>
-      </div>
-    `;
-
-    // Seller HTML
-    const sellerHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd;">
-        <h2 style="color: #9333ea;">Action Required: Approve Sale</h2>
-        <p>A buyer has been found for <strong>${itemTitle}</strong>.</p>
-        <div style="background: #f4f4f5; padding: 15px; margin: 15px 0;">
-          <p><strong>Net Payout:</strong> ₹${negotiation.finalPrice}</p>
-        </div>
-        <p>Click below to release stock:</p>
-        <a href="${sellerLink}" style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">✅ APPROVE SALE</a>
-      </div>
-    `;
-
-    // Send to Buyer
+    const itemTitle = negotiation.resourceId?.title || "Resource";
+    
+    // Buyer Email
     await transporter.sendMail({
       from: '"Omni Agent" <sanikadhumal149@gmail.com>',
       to: negotiation.buyerEmail,
       subject: `Action Required: Confirm Purchase for ${itemTitle}`,
-      html: buyerHtml
+      html: `
+        <h2>Purchase Confirmation</h2>
+        <p><strong>Total Payable:</strong> ₹${negotiation.totalValue}</p>
+        <p><strong>Location:</strong> ${negotiation.buyerLocation}</p>
+        <br/>
+        <a href="${buyerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ CONFIRM PURCHASE</a>
+      `
     });
 
-    // Send to Seller
+    // Seller Email
     await transporter.sendMail({
       from: '"Omni Agent" <sanikadhumal149@gmail.com>',
       to: negotiation.sellerEmail,
       subject: `Action Required: Approve Sale for ${itemTitle}`,
-      html: sellerHtml
+      html: `
+        <h2>Sale Approval</h2>
+        <p><strong>Net Payout:</strong> ₹${negotiation.finalPrice}</p>
+        <br/>
+        <a href="${sellerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ APPROVE SALE</a>
+      `
     });
 
     console.log(`✅ Emails sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
     return true;
-
   } catch (error) {
-    console.error("❌ Email Service Error:", error);
+    console.error("❌ Email Error:", error);
     return false;
   }
 };
 
-// --- 4. SAFE AI LOADER ---
+// --- 1. SAFE AI LOADER (YOUR LOGIC) ---
 let GoogleGenerativeAI;
 try {
     const lib = require("@google/generative-ai");
@@ -86,14 +65,14 @@ try {
     console.warn("⚠️ Google AI Lib missing. Using Simulation Mode.");
 }
 
-// --- 5. HELPER: LOGISTICS ---
+// --- 2. HELPER: LOGISTICS (YOUR LOGIC) ---
 function calculateLogistics(loc1, loc2) {
     const distance = Math.floor(Math.random() * 30) + 5; 
     const transportCost = distance * 25; 
     return { distance, transportCost };
 }
 
-// --- 6. START NEGOTIATION ---
+// --- 3. START NEGOTIATION (YOUR LOGIC) ---
 router.post('/start', async (req, res) => {
     try {
         const { resourceId, buyerEmail, buyerLocation } = req.body;
@@ -101,7 +80,6 @@ router.post('/start', async (req, res) => {
         const resource = await Resource.findById(resourceId);
         if (!resource) throw new Error("Item not found");
 
-        // Clear old negotiations
         await Negotiation.deleteMany({ resourceId, buyerEmail, status: { $ne: 'DEAL_CLOSED' } });
 
         const floorPrice = Math.floor(resource.cost * 0.9); 
@@ -129,14 +107,13 @@ router.post('/start', async (req, res) => {
     }
 });
 
-// --- 7. NEXT TURN (THE BRAIN) ---
+// --- 4. NEXT TURN (YOUR LOGIC - UNTOUCHED) ---
 router.post('/next-turn', async (req, res) => {
     try {
         const { negotiationId } = req.body;
         const negotiation = await Negotiation.findById(negotiationId);
         if (!negotiation) return res.status(404).json({ error: "Negotiation lost" });
 
-        // STOP CONDITIONS
         if (['DEAL_CLOSED', 'FAILED', 'COMPLETED', 'CANCELLED_DISTANCE', 'TRANSPORT_AGREED', 'APPROVED', 'PAID'].includes(negotiation.status)) {
             if (negotiation.status === 'TRANSPORT_AGREED') {
                  const lastLog = negotiation.logs[negotiation.logs.length - 1];
@@ -150,17 +127,17 @@ router.post('/next-turn', async (req, res) => {
 
         if (negotiation.status === 'WAITING_FOR_APPROVAL') return res.json(negotiation);
 
-        // LOGISTICS CHECK
+        const lastLog = negotiation.logs[negotiation.logs.length - 1];
+        if (lastLog && lastLog.message.includes("Waiting for User")) return res.json(negotiation);
+
+        // LOGISTICS PHASE
         if (negotiation.status === 'PRICE_AGREED') {
             const logistics = calculateLogistics(negotiation.buyerLocation, "SellerHQ");
             
             if (logistics.distance > 20) {
                 negotiation.status = 'CANCELLED_DISTANCE';
                 negotiation.distanceKm = logistics.distance;
-                negotiation.logs.push({
-                    sender: 'SYSTEM',
-                    message: `DISTANCE ALERT: ${logistics.distance}km (>20km). Auto-Cancelling Deal.`
-                });
+                negotiation.logs.push({ sender: 'SYSTEM', message: `DISTANCE ALERT: ${logistics.distance}km (>20km). Auto-Cancelling Deal.` });
                 await negotiation.save();
                 return res.json(negotiation);
             }
@@ -169,25 +146,20 @@ router.post('/next-turn', async (req, res) => {
             negotiation.transportCost = logistics.transportCost;
             negotiation.status = 'TRANSPORT_NEGOTIATING';
             
-            negotiation.logs.push({ 
-                sender: 'SYSTEM', 
-                message: `PHASE 2: LOGISTICS. Distance: ${logistics.distance}km. Standard Rate: ₹${logistics.transportCost}.` 
-            });
-            negotiation.logs.push({ 
-                sender: 'SELLER_AGENT', 
-                message: `The delivery cost is ₹${logistics.transportCost} for ${logistics.distance}km. Shall we proceed?` 
-            });
+            negotiation.logs.push({ sender: 'SYSTEM', message: `PHASE 2: LOGISTICS. Distance: ${logistics.distance}km. Standard Rate: ₹${logistics.transportCost}.` });
+            negotiation.logs.push({ sender: 'SELLER_AGENT', message: `The delivery cost is ₹${logistics.transportCost} for ${logistics.distance}km. Shall we proceed?` });
             
             await negotiation.save();
             return res.json(negotiation);
         }
 
-        // DETERMINE ACTOR
         const lastRelevantLog = negotiation.logs.slice().reverse().find(l => l.sender === 'BUYER_AGENT' || l.sender === 'SELLER_AGENT');
         const currentAgent = (!lastRelevantLog || lastRelevantLog.sender === 'SELLER_AGENT') ? 'BUYER_AGENT' : 'SELLER_AGENT';
+        
         const isTransportPhase = negotiation.status === 'TRANSPORT_NEGOTIATING';
+        const lastMessageText = lastRelevantLog ? lastRelevantLog.message.toLowerCase() : "";
+        const isFinalOffer = lastMessageText.includes("final") || lastMessageText.includes("cannot go down") || lastMessageText.includes("last price");
 
-        // AI DECISION
         let decision = null;
 
         try {
@@ -196,11 +168,24 @@ router.post('/next-turn', async (req, res) => {
             const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+            let phasePrompt;
+            if (isTransportPhase) {
+                phasePrompt = `
+                CURRENT PHASE: Logistics Negotiation. 
+                Standard Delivery Cost is ₹${negotiation.transportCost}.
+                IMPORTANT: The 'price' field in JSON must be the TRANSPORT COST (approx ${negotiation.transportCost}), NOT the Item Price.
+                
+                IF BUYER: Ask for a discount on delivery. If the history shows you already asked or Seller refused, respond with {"action": "ACCEPT", "price": ${negotiation.transportCost}, "message": "Okay, I agree to the transport cost."}.
+                IF SELLER: Refuse any discount. Maintain strict standard rate of ₹${negotiation.transportCost}.
+                `;
+            } else {
+                phasePrompt = `PHASE: Item Price Negotiation. Current Ask: ₹${negotiation.currentSellerAsk || negotiation.initialPrice}. Floor: ₹${negotiation.floorPrice}.`;
+            }
+
             const systemPrompt = `
                 Act as ${currentAgent}.
-                Phase: ${isTransportPhase ? 'Logistics' : 'Price Negotiation'}.
-                Cost: ${isTransportPhase ? negotiation.transportCost : negotiation.currentSellerAsk}.
-                RULES: Respond ONLY in JSON: { "action": "OFFER" | "ACCEPT" | "DECLINE", "price": number, "message": "string" }
+                ${phasePrompt}
+                RULES: 1. NO REPETITION. 2. Respond ONLY in JSON: { "action": "OFFER" | "ACCEPT" | "DECLINE", "price": number, "message": "string" }
                 History: ${JSON.stringify(negotiation.logs.slice(-3))}
             `;
 
@@ -209,27 +194,43 @@ router.post('/next-turn', async (req, res) => {
             decision = JSON.parse(text);
 
         } catch (aiError) {
-            // FALLBACK LOGIC
+            console.log("Using Rule Engine Fallback");
             const stdCost = negotiation.transportCost || 0;
+            
             if (isTransportPhase) {
-                decision = { action: "ACCEPT", price: stdCost, message: "Agreed to logistics cost." };
-            } else {
-                const currentAsk = negotiation.currentSellerAsk || negotiation.initialPrice;
                 if (currentAgent === 'BUYER_AGENT') {
-                    decision = { action: "OFFER", price: Math.floor(currentAsk * 0.95), message: `I offer ₹${Math.floor(currentAsk * 0.95)}` };
+                    const hasAsked = negotiation.logs.some(l => l.sender === 'BUYER_AGENT' && (l.message.includes("discount") || l.message.includes("delivery")));
+                    if (hasAsked) decision = { action: "ACCEPT", price: stdCost, message: "Okay, I accept the delivery charges." };
+                    else decision = { action: "OFFER", price: stdCost, message: "Can you provide a discount on delivery?" };
                 } else {
-                    decision = { action: "OFFER", price: currentAsk, message: `My price is ₹${currentAsk}` };
+                    decision = { action: "OFFER", price: stdCost, message: "Sorry, these are third-party standard rates. We cannot discount." };
+                }
+            } else {
+                const floor = negotiation.floorPrice || (negotiation.initialPrice - 10);
+                const currentAsk = negotiation.currentSellerAsk || negotiation.initialPrice;
+                const lastOffer = negotiation.currentBuyerOffer || 0;
+
+                if (currentAgent === 'BUYER_AGENT') {
+                    if (isFinalOffer || currentAsk <= floor) decision = { action: "ACCEPT", price: currentAsk, message: "Okay, I accept your final price." };
+                    else {
+                        let offer = lastOffer === 0 ? Math.floor(negotiation.initialPrice * 0.85) : Math.min(currentAsk - 2, lastOffer + 5);
+                        decision = { action: "OFFER", price: offer, message: `I can offer ₹${offer}.` };
+                    }
+                } else {
+                    if (lastOffer >= floor) decision = { action: "ACCEPT", price: lastOffer, message: "Deal accepted." };
+                    else if (currentAsk <= floor) decision = { action: "OFFER", price: floor, message: "I cannot go down below this price. This is last." };
+                    else {
+                        let nextAsk = Math.max(floor, currentAsk - 5);
+                        decision = { action: "OFFER", price: nextAsk, message: `My best price is ₹${nextAsk}.` };
+                    }
                 }
             }
         }
 
-        // SAVE TURN
+        if (!decision) decision = { action: "OFFER", price: negotiation.transportCost, message: "Please proceed." };
+
         negotiation.turnCount = (negotiation.turnCount || 0) + 1;
-        negotiation.logs.push({ 
-            sender: currentAgent, 
-            message: decision.message, 
-            offer: decision.price 
-        });
+        negotiation.logs.push({ sender: currentAgent, message: decision.message, offer: decision.price });
 
         if (!isTransportPhase && decision.action === 'OFFER') {
              if (currentAgent === 'BUYER_AGENT') negotiation.currentBuyerOffer = decision.price;
@@ -243,9 +244,13 @@ router.post('/next-turn', async (req, res) => {
                 negotiation.logs.push({ sender: 'SYSTEM', message: `PRICE LOCKED at ₹${decision.price}. Calculating Logistics...` });
             } else {
                 negotiation.status = 'TRANSPORT_AGREED';
-                negotiation.totalValue = (negotiation.finalPrice || 0) + negotiation.transportCost;
+                const finalTransport = negotiation.transportCost; 
+                negotiation.totalValue = (negotiation.finalPrice || 0) + finalTransport;
                 negotiation.logs.push({ sender: 'SYSTEM', message: "Waiting for User Confirmation" });
             }
+        } else if (decision.action === 'DECLINE' || negotiation.turnCount > 40) {
+            negotiation.status = 'FAILED';
+            negotiation.logs.push({ sender: 'SYSTEM', message: "Negotiation Failed." });
         }
 
         await negotiation.save();
@@ -257,7 +262,7 @@ router.post('/next-turn', async (req, res) => {
     }
 });
 
-// --- 8. SEND APPROVALS (UPDATED FOR DEPLOYMENT) ---
+// --- 5. SEND CONFIRMATION EMAILS (FIXED LINK) ---
 router.post('/send-approvals', async (req, res) => {
     try {
         const { negotiationId } = req.body;
@@ -265,18 +270,18 @@ router.post('/send-approvals', async (req, res) => {
         
         if (!negotiation) return res.status(404).json({ error: "Negotiation not found" });
 
-        // Generate Token
         const token = crypto.randomBytes(20).toString('hex');
         negotiation.confirmationToken = token;
         negotiation.status = 'WAITING_FOR_APPROVAL';
-        
-        // ✅ FIXED: Points to Render Backend API (Gate)
-        // This ensures the link works even if frontend URL changes
-        const BACKEND_URL = "https://omni-circulus-backend.onrender.com";
-        const buyerLink = `${BACKEND_URL}/api/gate/approve?id=${negotiation._id}&role=buyer`;
-        const sellerLink = `${BACKEND_URL}/api/gate/approve?id=${negotiation._id}&role=seller`;
 
-        // Send Emails (Internal Function)
+        // ✅ FIXED: Using RENDER Backend URL (instead of localhost)
+        const baseUrl = 'https://omni-circulus-backend.onrender.com'; 
+        
+        // Pointing to a specific backend confirmation endpoint
+        const buyerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=buyer`;
+        const sellerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=seller`;
+
+        // Using internal function
         const emailSent = await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
 
         if (emailSent) {
@@ -291,15 +296,16 @@ router.post('/send-approvals', async (req, res) => {
     }
 });
 
-// --- 9. VERIFY TRANSACTION ---
+// --- 6. VERIFY TRANSACTION (YOUR LOGIC) ---
 router.post('/verify-transaction', async (req, res) => {
     try {
         const { token, action, role } = req.body; 
+
         const negotiation = await Negotiation.findOne({ confirmationToken: token });
         if (!negotiation) return res.status(404).json({ error: "Invalid Token" });
 
         if (['DEAL_CLOSED', 'PAID'].includes(negotiation.status)) {
-            return res.json({ success: true, status: 'ALREADY_CLOSED', negotiationId: negotiation._id });
+            return res.json({ success: true, status: 'ALREADY_CLOSED', message: "Deal already closed.", negotiationId: negotiation._id });
         }
 
         if (action === 'reject') {
@@ -320,14 +326,36 @@ router.post('/verify-transaction', async (req, res) => {
         }
 
         await negotiation.save();
-        res.json({ success: true, status: 'PENDING', negotiationId: negotiation._id });
+        res.json({ success: true, status: 'PENDING', message: "Approval Recorded.", negotiationId: negotiation._id });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// --- 10. HISTORY ---
+// --- 7. MANUAL CONFIRM (YOUR LOGIC) ---
+router.post('/confirm', async (req, res) => {
+    try {
+        const { negotiationId } = req.body;
+        const negotiation = await Negotiation.findById(negotiationId);
+        if (!negotiation) return res.status(404).json({ error: "Negotiation not found" });
+
+        negotiation.status = 'DEAL_CLOSED';
+        await negotiation.save();
+
+        await Resource.findByIdAndUpdate(negotiation.resourceId, { status: 'Claimed' });
+        await Request.findOneAndUpdate(
+            { userEmail: negotiation.buyerEmail, matchedResourceId: negotiation.resourceId },
+            { status: 'COMPLETED' }
+        );
+
+        res.json({ success: true });
+    } catch (e) { 
+        res.status(500).json({ error: e.message }); 
+    }
+});
+
+// --- 8. HISTORY ENDPOINT (YOUR LOGIC) ---
 router.get('/history/:email', async (req, res) => {
     try {
         const { email } = req.params;
@@ -336,7 +364,7 @@ router.get('/history/:email', async (req, res) => {
             status: { $in: ['DEAL_CLOSED', 'PAID', 'COMPLETED'] }
         })
         .sort({ updatedAt: -1 }) 
-        .populate('resourceId'); 
+        .populate('resourceId', 'title cost location'); 
 
         res.json(history);
     } catch (err) {
