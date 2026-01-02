@@ -5,23 +5,39 @@ const crypto = require('crypto');
 const nodemailer = require('nodemailer'); 
 require('dotenv').config();
 
-// --- 📧 EMAIL CONFIGURATION ---
+// --- 🛠️ HELPER: Safe Model Loader ---
+// This prevents the "Schema hasn't been registered" error.
+const getModel = (modelName) => {
+    try {
+        return mongoose.model(modelName);
+    } catch (e) {
+        // If model is missing, try to assume standard path or throw specific error
+        console.error(`❌ CRITICAL ERROR: Model '${modelName}' is not loaded.`);
+        throw new Error(`Model ${modelName} not registered. Make sure to require it in app.js.`);
+    }
+};
+
+// --- 📧 EMAIL CONFIGURATION (UPDATED TO PORT 587) ---
+// Switched to Port 587 (STARTTLS) which is more reliable on Render than 465.
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, 
+  port: 587,              // ✅ Changed to 587
+  secure: false,          // ✅ Changed to false (Upgrade later with STARTTLS)
   auth: {
     user: 'sanikadhumal149@gmail.com', 
-    pass: 'kavgwoqdovdtsrmz' // ✅ SPACES REMOVED
+    pass: 'kavgwoqdovdtsrmz' 
+  },
+  tls: {
+    rejectUnauthorized: false // ✅ Helps prevent SSL handshake errors
   }
 });
 
 // --- 📧 INTERNAL EMAIL SENDER FUNCTION ---
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
   try {
-    console.log("📧 Attempting to send emails...");
-    console.log(`   Buyer: ${negotiation.buyerEmail}`);
-    console.log(`   Seller: ${negotiation.sellerEmail}`);
+    console.log(`📧 Sending Emails...`);
+    console.log(`   To Buyer: ${negotiation.buyerEmail}`);
+    console.log(`   To Seller: ${negotiation.sellerEmail}`);
 
     const itemTitle = negotiation.resourceId?.title || "Resource";
     
@@ -55,7 +71,7 @@ const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
     console.log(`✅ Emails sent successfully.`);
     return true;
   } catch (error) {
-    console.error("❌ Email System Error:", error);
+    console.error("❌ Transporter Error:", error);
     return false;
   }
 };
@@ -81,8 +97,8 @@ router.post('/start', async (req, res) => {
     try {
         const { resourceId, buyerEmail, buyerLocation } = req.body;
         
-        const Resource = mongoose.model('Resource');
-        const Negotiation = mongoose.model('Negotiation');
+        const Resource = getModel('Resource');
+        const Negotiation = getModel('Negotiation');
         
         const resource = await Resource.findById(resourceId);
         if (!resource) throw new Error("Item not found");
@@ -90,6 +106,7 @@ router.post('/start', async (req, res) => {
         await Negotiation.deleteMany({ resourceId, buyerEmail, status: { $ne: 'DEAL_CLOSED' } });
 
         const floorPrice = Math.floor(resource.cost * 0.9); 
+        // Force fallback email if missing
         const sellerEmail = resource.ownerEmail || 'sanikadhumal149@gmail.com';
 
         const negotiation = new Negotiation({
@@ -119,7 +136,7 @@ router.post('/start', async (req, res) => {
 router.post('/next-turn', async (req, res) => {
     try {
         const { negotiationId } = req.body;
-        const Negotiation = mongoose.model('Negotiation');
+        const Negotiation = getModel('Negotiation');
 
         const negotiation = await Negotiation.findById(negotiationId);
         if (!negotiation) return res.status(404).json({ error: "Negotiation lost" });
@@ -272,19 +289,25 @@ router.post('/next-turn', async (req, res) => {
     }
 });
 
-// --- 5. SEND APPROVALS (AUTO-REPAIR FIX) ---
+// --- 5. SEND APPROVALS (DEBUGGED & FIXED) ---
 router.post('/send-approvals', async (req, res) => {
     try {
         const { negotiationId } = req.body;
-        const Negotiation = mongoose.model('Negotiation'); 
         
+        // 1. Safe Model Load
+        const Negotiation = getModel('Negotiation');
+        
+        // 2. Fetch Negotiation
         const negotiation = await Negotiation.findById(negotiationId).populate('resourceId');
         
-        if (!negotiation) return res.status(404).json({ error: "Negotiation not found" });
+        if (!negotiation) {
+            console.error("❌ Negotiation ID not found in DB");
+            return res.status(404).json({ error: "Negotiation not found" });
+        }
 
-        // 🔥 AUTO-REPAIR: If Seller Email is missing, use default
+        // 3. Auto-Repair Missing Email
         if (!negotiation.sellerEmail) {
-            console.log("⚠️ Missing Seller Email. Fixing it now...");
+            console.warn("⚠️ Seller Email is missing. Using Admin Fallback.");
             negotiation.sellerEmail = 'sanikadhumal149@gmail.com'; 
             await negotiation.save();
         }
@@ -298,22 +321,32 @@ router.post('/send-approvals', async (req, res) => {
         const buyerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=buyer`;
         const sellerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=seller`;
 
+        // 4. Attempt Email Send
+        console.log("🚀 Dispatching Emails...");
         const emailSent = await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
 
         if (emailSent) {
             negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
             await negotiation.save();
-            res.json({ success: true, message: "Emails Sent" });
+            return res.json({ success: true, message: "Emails Sent" });
         } else {
-            // If email fails, don't crash, just report it
-            console.error("❌ Email failed to send despite fixes.");
-            negotiation.status = 'TRANSPORT_AGREED'; // Revert state
+            // 5. Handle Email Failure specifically
+            console.error("❌ Email Dispatch Failed (Check Transporter Logs above)");
+            negotiation.status = 'TRANSPORT_AGREED'; // Revert
             await negotiation.save();
-            res.status(500).json({ error: "Email could not be sent. Check backend logs." });
+            return res.status(500).json({ 
+                error: "EMAIL_FAILED", 
+                details: "Check server logs for Auth/Network error." 
+            });
         }
     } catch (err) {
-        console.error("Server Crash in Send-Approvals:", err);
-        res.status(500).json({ error: err.message });
+        console.error("❌ CRITICAL SERVER ERROR in send-approvals:", err);
+        // This ensures you see the REAL error in the browser network tab
+        return res.status(500).json({ 
+            error: "CRITICAL_ERROR", 
+            message: err.message, 
+            stack: err.stack 
+        });
     }
 });
 
@@ -321,7 +354,7 @@ router.post('/send-approvals', async (req, res) => {
 router.post('/verify-transaction', async (req, res) => {
     try {
         const { token, action, role } = req.body; 
-        const Negotiation = mongoose.model('Negotiation'); 
+        const Negotiation = getModel('Negotiation'); 
 
         const negotiation = await Negotiation.findOne({ confirmationToken: token });
         if (!negotiation) return res.status(404).json({ error: "Invalid Token" });
@@ -359,9 +392,9 @@ router.post('/verify-transaction', async (req, res) => {
 router.post('/confirm', async (req, res) => {
     try {
         const { negotiationId } = req.body;
-        const Negotiation = mongoose.model('Negotiation'); 
-        const Resource = mongoose.model('Resource');
-        const Request = mongoose.model('Request');
+        const Negotiation = getModel('Negotiation');
+        const Resource = getModel('Resource');
+        const Request = getModel('Request');
 
         const negotiation = await Negotiation.findById(negotiationId);
         if (!negotiation) return res.status(404).json({ error: "Negotiation not found" });
@@ -385,7 +418,7 @@ router.post('/confirm', async (req, res) => {
 router.get('/history/:email', async (req, res) => {
     try {
         const { email } = req.params;
-        const Negotiation = mongoose.model('Negotiation'); 
+        const Negotiation = getModel('Negotiation'); 
 
         const history = await Negotiation.find({ 
             buyerEmail: email, 
