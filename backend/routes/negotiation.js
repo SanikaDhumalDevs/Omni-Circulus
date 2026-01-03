@@ -1,61 +1,131 @@
 const express = require('express');
 const router = express.Router();
-const mongoose = require('mongoose'); 
+const mongoose = require('mongoose');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer'); 
 require('dotenv').config();
 
-// --- 🛠️ FIX 1: EMAIL CONFIGURATION (Robust for Render) ---
-// Using 'service: gmail' handles the ports automatically.
+// ============================================================
+// 📧 1. EMAIL CONFIGURATION (THE FINAL FIX)
+// ============================================================
+// We use "service: 'gmail'" instead of manual ports.
+// This tells Nodemailer to handle all the complex connection logic automatically.
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service: 'gmail', 
   auth: {
     user: 'sanikadhumal149@gmail.com', 
-    pass: 'kavgwoqdovdtsrmz' // ✅ SPACES REMOVED (This was the main auth error)
+    pass: 'kavgwoqdovdtsrmz' // ✅ Correct App Password (No Spaces)
   }
 });
 
-// --- 📧 INTERNAL EMAIL SENDER FUNCTION ---
+// --- Helper: Internal Email Sender ---
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
-  try {
-    const itemTitle = negotiation.resourceId?.title || "Resource";
-    
-    // Buyer Email
-    await transporter.sendMail({
-      from: '"Omni Agent" <sanikadhumal149@gmail.com>',
-      to: negotiation.buyerEmail,
-      subject: `Action Required: Confirm Purchase for ${itemTitle}`,
-      html: `
-        <h2>Purchase Confirmation</h2>
-        <p><strong>Total Payable:</strong> ₹${negotiation.totalValue}</p>
-        <p><strong>Location:</strong> ${negotiation.buyerLocation}</p>
-        <br/>
-        <a href="${buyerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ CONFIRM PURCHASE</a>
-      `
-    });
+  console.log(`📨 Initiating Email Dispatch...`);
+  
+  const itemTitle = negotiation.resourceId?.title || "Resource";
+  
+  // 1. Send Buyer Email
+  await transporter.sendMail({
+    from: '"Omni Agent" <sanikadhumal149@gmail.com>',
+    to: negotiation.buyerEmail,
+    subject: `Action Required: Confirm Purchase for ${itemTitle}`,
+    html: `
+      <h2>Purchase Confirmation</h2>
+      <p><strong>Total Payable:</strong> ₹${negotiation.totalValue}</p>
+      <p><strong>Location:</strong> ${negotiation.buyerLocation}</p>
+      <br/>
+      <a href="${buyerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ CONFIRM PURCHASE</a>
+    `
+  });
 
-    // Seller Email
-    await transporter.sendMail({
-      from: '"Omni Agent" <sanikadhumal149@gmail.com>',
-      to: negotiation.sellerEmail,
-      subject: `Action Required: Approve Sale for ${itemTitle}`,
-      html: `
-        <h2>Sale Approval</h2>
-        <p><strong>Net Payout:</strong> ₹${negotiation.finalPrice}</p>
-        <br/>
-        <a href="${sellerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ APPROVE SALE</a>
-      `
-    });
+  // 2. Send Seller Email
+  await transporter.sendMail({
+    from: '"Omni Agent" <sanikadhumal149@gmail.com>',
+    to: negotiation.sellerEmail,
+    subject: `Action Required: Approve Sale for ${itemTitle}`,
+    html: `
+      <h2>Sale Approval</h2>
+      <p><strong>Net Payout:</strong> ₹${negotiation.finalPrice}</p>
+      <br/>
+      <a href="${sellerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ APPROVE SALE</a>
+    `
+  });
 
-    console.log(`✅ Emails sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
-    return true;
-  } catch (error) {
-    console.error("❌ Email Error:", error);
-    return false;
-  }
+  console.log(`✅ Emails successfully sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
+  return true;
 };
 
-// --- SAFE AI LOADER (Your Original Logic) ---
+// ============================================================
+// 🛠️ 2. THE PROBLEMATIC ROUTE (FULLY REPAIRED)
+// ============================================================
+router.post('/send-approvals', async (req, res) => {
+    try {
+        console.log("➡️ /send-approvals route triggered");
+        const { negotiationId } = req.body;
+        
+        // Load Model
+        const Negotiation = mongoose.model('Negotiation');
+        
+        // Find Deal
+        const negotiation = await Negotiation.findById(negotiationId).populate('resourceId');
+        if (!negotiation) {
+            console.error("❌ Negotiation not found in DB");
+            return res.status(404).json({ error: "Negotiation not found" });
+        }
+
+        // 🔥 AUTO-REPAIR: Fix missing emails from old bad data
+        // This prevents the "500" crash if the database has empty email fields
+        if (!negotiation.sellerEmail) {
+            console.log("⚠️ Patching missing Seller Email...");
+            negotiation.sellerEmail = 'sanikadhumal149@gmail.com';
+        }
+        if (!negotiation.buyerEmail) {
+            console.log("⚠️ Patching missing Buyer Email...");
+            negotiation.buyerEmail = 'sanikadhumal149@gmail.com';
+        }
+        await negotiation.save();
+
+        // Prepare Tokens & Links
+        const token = crypto.randomBytes(20).toString('hex');
+        negotiation.confirmationToken = token;
+        negotiation.status = 'WAITING_FOR_APPROVAL';
+
+        const baseUrl = 'https://omni-circulus-backend.onrender.com';
+        const buyerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=buyer`;
+        const sellerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=seller`;
+
+        // Send
+        await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
+
+        // Success Response
+        negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
+        await negotiation.save();
+        
+        res.status(200).json({ success: true, message: "Emails Sent Successfully" });
+
+    } catch (err) {
+        console.error("🔥 CRITICAL EMAIL FAILURE:", err);
+        
+        // Revert status so user can try again
+        try {
+            const Negotiation = mongoose.model('Negotiation');
+            await Negotiation.findByIdAndUpdate(req.body.negotiationId, { status: 'TRANSPORT_AGREED' });
+        } catch (e) {}
+
+        // Send ACTUAL error message to frontend (so you know what's wrong)
+        res.status(500).json({ 
+            error: "EMAIL_FAILED", 
+            details: err.message 
+        });
+    }
+});
+
+
+// ============================================================
+// 🧩 3. REST OF THE FILE (YOUR LOGIC PRESERVED)
+// ============================================================
+
+// --- SAFE AI LOADER ---
 let GoogleGenerativeAI;
 try {
     const lib = require("@google/generative-ai");
@@ -64,19 +134,18 @@ try {
     console.warn("⚠️ Google AI Lib missing. Using Simulation Mode.");
 }
 
-// --- HELPER: LOGISTICS (Your Original Logic) ---
+// --- HELPER: LOGISTICS ---
 function calculateLogistics(loc1, loc2) {
     const distance = Math.floor(Math.random() * 30) + 5; 
     const transportCost = distance * 25; 
     return { distance, transportCost };
 }
 
-// --- 3. START NEGOTIATION ---
+// --- START NEGOTIATION ---
 router.post('/start', async (req, res) => {
     try {
         const { resourceId, buyerEmail, buyerLocation } = req.body;
         
-        // 🛠️ FIX 2: Safe Model Loading inside the route
         const Resource = mongoose.model('Resource');
         const Negotiation = mongoose.model('Negotiation');
         
@@ -86,8 +155,6 @@ router.post('/start', async (req, res) => {
         await Negotiation.deleteMany({ resourceId, buyerEmail, status: { $ne: 'DEAL_CLOSED' } });
 
         const floorPrice = Math.floor(resource.cost * 0.9); 
-
-        // 🛠️ FIX 3: Prevent crash if ownerEmail is missing
         const sellerEmail = resource.ownerEmail || 'sanikadhumal149@gmail.com';
 
         const negotiation = new Negotiation({
@@ -113,11 +180,11 @@ router.post('/start', async (req, res) => {
     }
 });
 
-// --- 4. NEXT TURN (Your Original Logic) ---
+// --- NEXT TURN ---
 router.post('/next-turn', async (req, res) => {
     try {
         const { negotiationId } = req.body;
-        const Negotiation = mongoose.model('Negotiation'); // Safe Load
+        const Negotiation = mongoose.model('Negotiation');
 
         const negotiation = await Negotiation.findById(negotiationId);
         if (!negotiation) return res.status(404).json({ error: "Negotiation lost" });
@@ -270,56 +337,11 @@ router.post('/next-turn', async (req, res) => {
     }
 });
 
-// --- 5. SEND APPROVALS (FIXED EMAIL LOGIC) ---
-router.post('/send-approvals', async (req, res) => {
-    try {
-        const { negotiationId } = req.body;
-        
-        // 🛠️ FIX 4: Safe Model Loading
-        const Negotiation = mongoose.model('Negotiation');
-        
-        const negotiation = await Negotiation.findById(negotiationId).populate('resourceId');
-        if (!negotiation) return res.status(404).json({ error: "Negotiation not found" });
-
-        // 🛠️ FIX 5: Fallback for old data missing emails
-        if (!negotiation.sellerEmail) negotiation.sellerEmail = 'sanikadhumal149@gmail.com';
-        if (!negotiation.buyerEmail) negotiation.buyerEmail = 'sanikadhumal149@gmail.com';
-
-        const token = crypto.randomBytes(20).toString('hex');
-        negotiation.confirmationToken = token;
-        negotiation.status = 'WAITING_FOR_APPROVAL';
-
-        const baseUrl = 'https://omni-circulus-backend.onrender.com'; 
-        
-        const buyerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=buyer`;
-        const sellerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=seller`;
-
-        // Send Email
-        const emailSent = await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
-
-        if (emailSent) {
-            negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
-            await negotiation.save();
-            res.json({ success: true, message: "Emails Sent" });
-        } else {
-            console.error("❌ Email sending function returned false.");
-            // Revert state so user can retry
-            negotiation.status = 'TRANSPORT_AGREED';
-            await negotiation.save();
-            // Send exact error to frontend
-            res.status(500).json({ error: "Failed to connect to Gmail. Check server logs." });
-        }
-    } catch (err) {
-        console.error("❌ ROUTE ERROR:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- 6. VERIFY TRANSACTION ---
+// --- VERIFY TRANSACTION ---
 router.post('/verify-transaction', async (req, res) => {
     try {
         const { token, action, role } = req.body; 
-        const Negotiation = mongoose.model('Negotiation'); // Safe Load
+        const Negotiation = mongoose.model('Negotiation');
 
         const negotiation = await Negotiation.findOne({ confirmationToken: token });
         if (!negotiation) return res.status(404).json({ error: "Invalid Token" });
@@ -353,11 +375,11 @@ router.post('/verify-transaction', async (req, res) => {
     }
 });
 
-// --- 7. MANUAL CONFIRM ---
+// --- MANUAL CONFIRM ---
 router.post('/confirm', async (req, res) => {
     try {
         const { negotiationId } = req.body;
-        const Negotiation = mongoose.model('Negotiation'); // Safe Load
+        const Negotiation = mongoose.model('Negotiation');
         const Resource = mongoose.model('Resource');
         const Request = mongoose.model('Request');
 
@@ -379,11 +401,11 @@ router.post('/confirm', async (req, res) => {
     }
 });
 
-// --- 8. HISTORY ENDPOINT ---
+// --- HISTORY ENDPOINT ---
 router.get('/history/:email', async (req, res) => {
     try {
         const { email } = req.params;
-        const Negotiation = mongoose.model('Negotiation'); // Safe Load
+        const Negotiation = mongoose.model('Negotiation');
 
         const history = await Negotiation.find({ 
             buyerEmail: email, 
