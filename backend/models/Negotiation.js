@@ -15,9 +15,9 @@ const NegotiationSchema = new mongoose.Schema({
         'TRANSPORT_NEGOTIATING',
         'TRANSPORT_AGREED',
         'WAITING_FOR_APPROVAL',
-        'APPROVED',             // <--- CRITICAL: Both approved, waiting for payment
-        'PAID',                 // <--- CRITICAL: Paid, Gate Pass generated
-        'DEAL_CLOSED',          // <--- Completed/Delivered
+        'APPROVED',             
+        'PAID',                 
+        'DEAL_CLOSED',          
         'FAILED',               
         'CANCELLED',
         'CANCELLED_DISTANCE'
@@ -75,7 +75,5 @@ const NegotiationSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-// ✅ SAFE EXPORT FIX
-// This checks if the model exists before compiling it again.
-// This prevents the "OverwriteModelError" that causes 500 crashes.
+// ✅ SAFE EXPORT
 module.exports = mongoose.models.Negotiation || mongoose.model('Negotiation', NegotiationSchema);
