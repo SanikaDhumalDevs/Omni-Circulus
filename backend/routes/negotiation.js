@@ -60,7 +60,7 @@ const Request = mongoose.models.Request || mongoose.model('Request', new mongoos
 
 
 // ==========================================
-// 📧 2. EMAIL CONFIGURATION (SECURE BREVO SETUP)
+// 📧 2. EMAIL CONFIGURATION (SECURE FOR GITHUB & RENDER)
 // ==========================================
 const transporter = nodemailer.createTransport({
   host: 'smtp-relay.brevo.com', // ✅ Brevo Server
@@ -68,8 +68,7 @@ const transporter = nodemailer.createTransport({
   secure: false,                // ✅ False for Port 587
   auth: {
     user: 'sanikadhumal149@gmail.com', 
-    // 👇 THIS IS THE FIX: We read the key from Render, not the file.
-    // This prevents GitHub from blocking your push.
+    // 👇 THIS IS THE FIX: GitHub will accept this because the password is hidden
     pass: process.env.SMTP_PASS 
   },
   tls: {
