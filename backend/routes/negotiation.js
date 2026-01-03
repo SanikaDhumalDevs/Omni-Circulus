@@ -62,15 +62,20 @@ const Request = mongoose.models.Request || mongoose.model('Request', new mongoos
 
 
 // ==========================================
-// 📧 2. EMAIL CONFIGURATION (RENDER SAFE)
+// 📧 2. EMAIL CONFIGURATION (FIXED FOR RENDER)
 // ==========================================
+// ⚠️ CHANGED: Port 465 -> 587 (Render blocks 465)
+// ⚠️ CHANGED: secure: true -> false (Required for 587)
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com', // Explicit Host
-  port: 465,              // Secure Port for Cloud Servers
-  secure: true,           // SSL Enabled
+  host: 'smtp.gmail.com',
+  port: 587,              // ✅ FIX: Use Port 587 for Cloud Servers
+  secure: false,          // ✅ FIX: Must be false for Port 587
   auth: {
     user: 'sanikadhumal149@gmail.com', 
     pass: 'kavgwoqdovdtsrmz' 
+  },
+  tls: {
+    rejectUnauthorized: false // ✅ FIX: Prevents SSL errors on Render
   }
 });
 
