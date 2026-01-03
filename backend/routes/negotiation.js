@@ -6,9 +6,8 @@ const nodemailer = require('nodemailer');
 require('dotenv').config();
 
 // ==========================================
-// 🛠️ 1. DEFINE SCHEMA DIRECTLY (FIXES CRASH)
+// 🛠️ 1. DEFINE SCHEMA DIRECTLY
 // ==========================================
-// We define the schema here so Render 100% finds it.
 const NegotiationSchema = new mongoose.Schema({
   resourceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Resource', required: true },
   buyerEmail: { type: String, required: true },
@@ -56,33 +55,29 @@ const NegotiationSchema = new mongoose.Schema({
 
 // ✅ REGISTER MODELS SAFELY
 const Negotiation = mongoose.models.Negotiation || mongoose.model('Negotiation', NegotiationSchema);
-// Prevent crash if Resource/Request models aren't loaded yet
 const Resource = mongoose.models.Resource || mongoose.model('Resource', new mongoose.Schema({}, { strict: false }));
 const Request = mongoose.models.Request || mongoose.model('Request', new mongoose.Schema({}, { strict: false }));
 
 
 // ==========================================
-// 📧 2. EMAIL CONFIGURATION (FIXED FOR RENDER)
+// 📧 2. EMAIL CONFIGURATION (THE FINAL FIX)
 // ==========================================
-// ⚠️ CHANGED: Port 465 -> 587 (Render blocks 465)
-// ⚠️ CHANGED: secure: true -> false (Required for 587)
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,              // ✅ FIX: Use Port 587 for Cloud Servers
-  secure: false,          // ✅ FIX: Must be false for Port 587
+  service: 'gmail', // ✅ Automatically handles Port/Host
   auth: {
     user: 'sanikadhumal149@gmail.com', 
     pass: 'kavgwoqdovdtsrmz' 
   },
-  tls: {
-    rejectUnauthorized: false // ✅ FIX: Prevents SSL errors on Render
-  }
+  // ⚠️ CRITICAL: Forces Node to use IPv4. 
+  // Render sometimes fails with IPv6 on Gmail, causing the timeout.
+  family: 4, 
 });
 
 // --- CONNECTION TEST ---
+console.log("🔄 SYSTEM: Attempting Email Service Connection...");
 transporter.verify((error, success) => {
   if (error) console.error("❌ EMAIL SERVICE ERROR:", error);
-  else console.log("✅ EMAIL SERVICE READY");
+  else console.log("✅ EMAIL SERVICE READY (IPv4 Forced)");
 });
 
 
@@ -134,39 +129,30 @@ router.post('/send-approvals', async (req, res) => {
     try {
         const { negotiationId } = req.body;
         
-        // 1. Load Model Directly (No getModel needed)
         const negotiation = await Negotiation.findById(negotiationId).populate('resourceId');
         
         if (!negotiation) {
             return res.status(404).json({ error: "Negotiation ID not found" });
         }
 
-        // 3. Auto-Fix Missing Emails (Prevents Crash on Old Data)
-        if (!negotiation.sellerEmail) {
-            console.log("⚠️ Patching missing Seller Email");
-            negotiation.sellerEmail = 'sanikadhumal149@gmail.com';
-        }
-        if (!negotiation.buyerEmail) {
-            console.log("⚠️ Patching missing Buyer Email");
-            negotiation.buyerEmail = 'sanikadhumal149@gmail.com';
-        }
+        // Auto-Fix Missing Emails
+        if (!negotiation.sellerEmail) negotiation.sellerEmail = 'sanikadhumal149@gmail.com';
+        if (!negotiation.buyerEmail) negotiation.buyerEmail = 'sanikadhumal149@gmail.com';
         
-        // Save the patched emails first
         await negotiation.save();
 
-        // 4. Generate Links
+        // Generate Links
         const token = crypto.randomBytes(20).toString('hex');
         negotiation.confirmationToken = token;
         negotiation.status = 'WAITING_FOR_APPROVAL';
 
         const baseUrl = 'https://omni-circulus-backend.onrender.com';
-        const buyerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=buyer&token=${token}`; // Added token
-        const sellerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=seller&token=${token}`; // Added token
+        const buyerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=buyer&token=${token}`;
+        const sellerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=seller&token=${token}`;
 
-        // 5. Send Emails
+        // Send Emails
         await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
 
-        // 6. Update Logs & Save
         negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
         await negotiation.save();
 
@@ -184,7 +170,7 @@ router.post('/send-approvals', async (req, res) => {
 
 
 // ==========================================
-// 🧩 4. YOUR ORIGINAL LOGIC (Unchanged)
+// 🧩 4. YOUR ORIGINAL LOGIC
 // ==========================================
 
 // --- SAFE AI LOADER ---
