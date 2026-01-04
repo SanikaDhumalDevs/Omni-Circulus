@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const sgMail = require('@sendgrid/mail'); 
+const nodemailer = require('nodemailer'); 
 require('dotenv').config();
 
 // ==========================================
-// 1. DEFINE SCHEMA DIRECTLY (UNCHANGED)
+// 1. DEFINE SCHEMA DIRECTLY
 // ==========================================
 const NegotiationSchema = new mongoose.Schema({
   resourceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Resource', required: true },
@@ -53,81 +53,83 @@ const NegotiationSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-// ✅ REGISTER MODELS SAFELY (UNCHANGED)
+// ✅ REGISTER MODELS SAFELY
 const Negotiation = mongoose.models.Negotiation || mongoose.model('Negotiation', NegotiationSchema);
 const Resource = mongoose.models.Resource || mongoose.model('Resource', new mongoose.Schema({}, { strict: false }));
 const Request = mongoose.models.Request || mongoose.model('Request', new mongoose.Schema({}, { strict: false }));
 
-// ==========================================
-// 📧 2. SENDGRID CONFIGURATION (NEW)
-// ==========================================
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-console.log("🔄 SYSTEM: SendGrid Email Service Initialized...");
-
-// Test SendGrid connection
-sgMail.send({
-  to: 'sanikadhumal149@gmail.com',
-  from: 'sanikadhumal149@gmail.com',
-  subject: 'SendGrid Test - Server Started',
-  text: '✅ SendGrid is working on Render!'
-}).then(() => {
-  console.log("✅ SENDGRID TEST SUCCESS");
-}).catch((error) => {
-  console.error("⚠️ SENDGRID TEST FAILED:", error.message);
+// ==========================================
+// 📧 2. EMAIL CONFIGURATION (PORT 2525 FIX)
+// ==========================================
+const transporter = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com', // Brevo Server
+  port: 2525,                   // ⚡ FIX: Port 2525 bypasses Render firewalls better than 587
+  secure: false,                // False for 2525
+  auth: {
+    user: 'sanikadhumal149@gmail.com', 
+    pass: process.env.SMTP_PASS // Reads from Render Environment Variable
+  },
+  tls: {
+    rejectUnauthorized: false
+  },
+  // Add timeouts so it doesn't hang forever
+  connectionTimeout: 10000, 
+  greetingTimeout: 10000
 });
 
+// --- CONNECTION TEST ---
+console.log("🔄 SYSTEM: Attempting Email Service Connection on Port 2525...");
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ EMAIL SERVICE ERROR:", error.message);
+  } else {
+    console.log("✅ EMAIL SERVICE READY");
+  }
+});
+
+
 // ==========================================
-// 📧 INTERNAL EMAIL SENDER FUNCTION (UPDATED)
+// 📧 INTERNAL EMAIL SENDER FUNCTION
 // ==========================================
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
-  console.log(`📨 Initiating SendGrid Email Dispatch...`);
+  console.log(`📨 Initiating Email Dispatch...`);
   
   const itemTitle = negotiation.resourceId?.title || "Resource";
   
-  // 1. Buyer Email
-  const buyerMsg = {
+  // 1. Send Buyer Email
+  await transporter.sendMail({
+    from: '"Omni Agent" <sanikadhumal149@gmail.com>', 
     to: negotiation.buyerEmail,
-    from: 'sanikadhumal149@gmail.com', 
     subject: `Action Required: Confirm Purchase for ${itemTitle}`,
     html: `
-      <h2>🚚 Purchase Confirmation</h2>
-      <p><strong>Total Payable:</strong> ₹${negotiation.totalValue.toFixed(2)}</p>
+      <h2>Purchase Confirmation</h2>
+      <p><strong>Total Payable:</strong> ₹${negotiation.totalValue}</p>
       <p><strong>Location:</strong> ${negotiation.buyerLocation}</p>
       <br/>
-      <a href="${buyerLink}" style="background-color:#16a34a;color:white;padding:15px 30px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block;">✅ CONFIRM PURCHASE</a>
-      <br/><br/>
-      <p><small>This link expires in 24 hours.</small></p>
+      <a href="${buyerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ CONFIRM PURCHASE</a>
     `
-  };
+  });
 
-  // 2. Seller Email
-  const sellerMsg = {
+  // 2. Send Seller Email
+  await transporter.sendMail({
+    from: '"Omni Agent" <sanikadhumal149@gmail.com>', 
     to: negotiation.sellerEmail,
-    from: 'sanikadhumal149@gmail.com', 
     subject: `Action Required: Approve Sale for ${itemTitle}`,
     html: `
-      <h2>💰 Sale Approval Required</h2>
-      <p><strong>Net Payout:</strong> ₹${negotiation.finalPrice.toFixed(2)}</p>
+      <h2>Sale Approval</h2>
+      <p><strong>Net Payout:</strong> ₹${negotiation.finalPrice}</p>
       <br/>
-      <a href="${sellerLink}" style="background-color:#16a34a;color:white;padding:15px 30px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block;">✅ APPROVE SALE</a>
-      <br/><br/>
-      <p><small>This link expires in 24 hours.</small></p>
+      <a href="${sellerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ APPROVE SALE</a>
     `
-  };
+  });
 
-  // Send both emails
-  await Promise.all([
-    sgMail.send(buyerMsg),
-    sgMail.send(sellerMsg)
-  ]);
-
-  console.log(`✅ SendGrid: Emails sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
+  console.log(`✅ Emails successfully sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
   return true;
 };
 
 // ==========================================
-// 🚀 3. SEND APPROVALS ROUTE (UPDATED - SAME LOGIC)
+// 🚀 3. THE SEND APPROVALS ROUTE (SAFE MODE)
 // ==========================================
 router.post('/send-approvals', async (req, res) => {
     console.log("➡️ ROUTE HIT: /send-approvals");
@@ -141,33 +143,37 @@ router.post('/send-approvals', async (req, res) => {
             return res.status(404).json({ error: "Negotiation ID not found" });
         }
 
-        // Auto-Fix Missing Emails (UNCHANGED)
+        // Auto-Fix Missing Emails
         if (!negotiation.sellerEmail) negotiation.sellerEmail = 'sanikadhumal149@gmail.com';
         if (!negotiation.buyerEmail) negotiation.buyerEmail = 'sanikadhumal149@gmail.com';
         
-        // Generate Links (UNCHANGED)
+        // Generate Links
         const token = crypto.randomBytes(20).toString('hex');
         negotiation.confirmationToken = token;
         
-        // ✅ LOGIC: STATUS UPDATE (UNCHANGED)
+        // ✅ LOGIC: STATUS UPDATE
         negotiation.status = 'WAITING_FOR_APPROVAL'; 
+        
         await negotiation.save(); 
 
         const baseUrl = 'https://omni-circulus-backend.onrender.com';
         const buyerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=buyer&token=${token}`;
         const sellerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=seller&token=${token}`;
 
-        // ⚠️ SAFETY BLOCK: Try SendGrid, don't crash if fails (UNCHANGED LOGIC)
+        // ⚠️ SAFETY BLOCK: Try to send email, but don't crash if it fails
         try {
             await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
-            negotiation.logs.push({ sender: 'SYSTEM', message: "✅ Approval Emails Sent via SendGrid. Waiting for parties..." });
+            negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
         } catch (emailError) {
-            console.error("⚠️ SENDGRID FAILED:", emailError.message);
+            console.error("⚠️ EMAIL FAILED (Network Timeout):", emailError.message);
+            // Log it for the user, but allow the app to continue
             negotiation.logs.push({ sender: 'SYSTEM', message: "Email delivery delayed (Network). Deal is Saved." });
         }
 
         await negotiation.save();
-        res.status(200).json({ success: true, message: "Emails Processed via SendGrid" });
+
+        // Always return success so the frontend doesn't crash
+        res.status(200).json({ success: true, message: "Emails Processed" });
 
     } catch (err) {
         console.error("🔥 CRITICAL SERVER ERROR:", err);
@@ -179,8 +185,9 @@ router.post('/send-approvals', async (req, res) => {
     }
 });
 
+
 // ==========================================
-// 🧩 4. ALL ORIGINAL ROUTES (100% UNCHANGED)
+// 🧩 4. YOUR ORIGINAL LOGIC (100% Intact)
 // ==========================================
 
 // --- SAFE AI LOADER ---
@@ -235,7 +242,7 @@ router.post('/start', async (req, res) => {
     }
 });
 
-// --- NEXT TURN --- (UNCHANGED - 100% same logic)
+// --- NEXT TURN ---
 router.post('/next-turn', async (req, res) => {
     try {
         const { negotiationId } = req.body;
@@ -390,7 +397,7 @@ router.post('/next-turn', async (req, res) => {
     }
 });
 
-// --- VERIFY TRANSACTION --- (UNCHANGED)
+// --- VERIFY TRANSACTION ---
 router.post('/verify-transaction', async (req, res) => {
     try {
         const { token, action, role } = req.body; 
@@ -427,7 +434,7 @@ router.post('/verify-transaction', async (req, res) => {
     }
 });
 
-// --- MANUAL CONFIRM --- (UNCHANGED)
+// --- MANUAL CONFIRM ---
 router.post('/confirm', async (req, res) => {
     try {
         const { negotiationId } = req.body;
@@ -450,7 +457,7 @@ router.post('/confirm', async (req, res) => {
     }
 });
 
-// --- HISTORY ENDPOINT --- (UNCHANGED)
+// --- HISTORY ENDPOINT ---
 router.get('/history/:email', async (req, res) => {
     try {
         const { email } = req.params;
