@@ -6,13 +6,12 @@ const sgMail = require('@sendgrid/mail');
 require('dotenv').config();
 
 // ==========================================
-// 1. DEFINE SCHEMA DIRECTLY
+// 1. DEFINE SCHEMA
 // ==========================================
 const NegotiationSchema = new mongoose.Schema({
   resourceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Resource', required: true },
   buyerEmail: { type: String, required: true },
   sellerEmail: { type: String, required: true },
-
   status: { 
     type: String, 
     enum: [
@@ -22,7 +21,6 @@ const NegotiationSchema = new mongoose.Schema({
     ], 
     default: 'INITIATED' 
   },
-  
   initialPrice: { type: Number, required: true }, 
   currentSellerAsk: { type: Number, default: 0 }, 
   currentBuyerOffer: { type: Number, default: 0 },       
@@ -34,15 +32,10 @@ const NegotiationSchema = new mongoose.Schema({
   sellerPayout: { type: Number, default: 0 },
   driverFee: { type: Number, default: 0 },
   paymentStatus: { type: String, default: 'PENDING' },
-  logistics: {
-    driverName: String, truckNumber: String, licensePlate: String,
-    driverPhone: String, gatePassId: String, estimatedArrival: String
-  },
   confirmationToken: { type: String }, 
   buyerApproval: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' },
   sellerApproval: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' },
   turnCount: { type: Number, default: 0 },
-  maxTurns: { type: Number, default: 20 }, 
   logs: [{
       sender: { type: String },
       message: { type: String }, 
@@ -53,36 +46,32 @@ const NegotiationSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-// ✅ REGISTER MODELS SAFELY
 const Negotiation = mongoose.models.Negotiation || mongoose.model('Negotiation', NegotiationSchema);
 const Resource = mongoose.models.Resource || mongoose.model('Resource', new mongoose.Schema({}, { strict: false }));
 const Request = mongoose.models.Request || mongoose.model('Request', new mongoose.Schema({}, { strict: false }));
 
-
 // ==========================================
-// 📧 2. SENDGRID CONFIGURATION
+// 2. SENDGRID CONFIGURATION
 // ==========================================
-// Reads SENDGRID_API_KEY from your Render Environment Variables
 if (process.env.SENDGRID_API_KEY) {
     sgMail.setApiKey(process.env.SENDGRID_API_KEY);
     console.log("✅ SENDGRID CONFIGURATION LOADED");
-} else {
-    console.warn("⚠️ WARNING: SENDGRID_API_KEY is missing in .env");
 }
 
+// ⚠️ Ensure this matches your Verified Sender in SendGrid
+const VERIFIED_SENDER = 'sanikadhumal149@gmail.com'; 
+
 // ==========================================
-// 📧 INTERNAL EMAIL SENDER FUNCTION (USING SENDGRID)
+// 3. EMAIL HELPER FUNCTION
 // ==========================================
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
-  console.log(`📨 Initiating Email Dispatch via SendGrid...`);
+  console.log(`📨 Sending emails via SendGrid...`);
   
   const itemTitle = negotiation.resourceId?.title || "Resource";
-  const senderEmail = 'sanikadhumal149@gmail.com'; // ⚠️ This email MUST be verified in SendGrid as a Sender
 
-  // 1. Prepare Buyer Email
   const buyerMsg = {
     to: negotiation.buyerEmail,
-    from: senderEmail, 
+    from: VERIFIED_SENDER, 
     subject: `Action Required: Confirm Purchase for ${itemTitle}`,
     html: `
       <h2>Purchase Confirmation</h2>
@@ -90,120 +79,52 @@ const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
       <p><strong>Location:</strong> ${negotiation.buyerLocation}</p>
       <br/>
       <a href="${buyerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ CONFIRM PURCHASE</a>
-      <p style="margin-top:20px; font-size:12px; color:#666;">If you did not request this, please ignore this email.</p>
     `
   };
 
-  // 2. Prepare Seller Email
   const sellerMsg = {
     to: negotiation.sellerEmail,
-    from: senderEmail,
+    from: VERIFIED_SENDER,
     subject: `Action Required: Approve Sale for ${itemTitle}`,
     html: `
       <h2>Sale Approval</h2>
       <p><strong>Net Payout:</strong> ₹${negotiation.finalPrice}</p>
       <br/>
       <a href="${sellerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ APPROVE SALE</a>
-      <p style="margin-top:20px; font-size:12px; color:#666;">If you did not request this, please ignore this email.</p>
     `
   };
 
   try {
-      // Send both emails
       await sgMail.send(buyerMsg);
       await sgMail.send(sellerMsg);
-      console.log(`✅ Emails successfully sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
+      console.log(`✅ Emails sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
       return true;
   } catch (error) {
-      console.error("❌ SendGrid Error:", error);
-      if (error.response) {
-          console.error(error.response.body);
-      }
-      throw error; // Re-throw to be caught by the route handler
+      console.error("❌ SENDGRID ERROR:", error.response ? error.response.body : error.message);
+      return false;
   }
 };
 
 // ==========================================
-// 🚀 3. THE SEND APPROVALS ROUTE (UPDATED FOR VERCEL FRONTEND)
+// 4. AI & LOGIC SETUP (From your Working Localhost)
 // ==========================================
-router.post('/send-approvals', async (req, res) => {
-    console.log("➡️ ROUTE HIT: /send-approvals");
-
-    try {
-        const { negotiationId } = req.body;
-        
-        const negotiation = await Negotiation.findById(negotiationId).populate('resourceId');
-        
-        if (!negotiation) {
-            return res.status(404).json({ error: "Negotiation ID not found" });
-        }
-
-        // Auto-Fix Missing Emails
-        if (!negotiation.sellerEmail) negotiation.sellerEmail = 'sanikadhumal149@gmail.com';
-        if (!negotiation.buyerEmail) negotiation.buyerEmail = 'sanikadhumal149@gmail.com';
-        
-        // Generate Links
-        const token = crypto.randomBytes(20).toString('hex');
-        negotiation.confirmationToken = token;
-        
-        // ✅ LOGIC: STATUS UPDATE
-        negotiation.status = 'WAITING_FOR_APPROVAL'; 
-        
-        await negotiation.save(); 
-
-        // ⚠️ UPDATED: Using your Vercel Frontend URL so it works on mobile
-        const baseUrl = 'https://omni-circulus.vercel.app';
-        
-        const buyerLink = `${baseUrl}/confirm-deal?token=${token}&role=buyer`;
-        const sellerLink = `${baseUrl}/confirm-deal?token=${token}&role=seller`;
-
-        // ⚠️ SAFETY BLOCK: Try to send email, but don't crash if it fails
-        try {
-            await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
-            negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
-        } catch (emailError) {
-            console.error("⚠️ EMAIL FAILED (SendGrid):", emailError.message);
-            // Log it for the user, but allow the app to continue
-            negotiation.logs.push({ sender: 'SYSTEM', message: "Email delivery failed. Deal is Saved." });
-        }
-
-        await negotiation.save();
-
-        // Always return success so the frontend doesn't crash
-        res.status(200).json({ success: true, message: "Emails Processed" });
-
-    } catch (err) {
-        console.error("🔥 CRITICAL SERVER ERROR:", err);
-        res.status(500).json({ 
-            error: "SERVER_ERROR", 
-            message: err.message || "Unknown Error",
-            stack: err.stack
-        });
-    }
-});
-
-
-// ==========================================
-// 🧩 4. YOUR ORIGINAL LOGIC (100% Intact)
-// ==========================================
-
-// --- SAFE AI LOADER ---
 let GoogleGenerativeAI;
 try {
     const lib = require("@google/generative-ai");
     GoogleGenerativeAI = lib.GoogleGenerativeAI;
-} catch (err) {
-    console.warn("⚠️ Google AI Lib missing. Using Simulation Mode.");
-}
+} catch (err) { console.warn("⚠️ Google AI Lib missing."); }
 
-// --- HELPER: LOGISTICS ---
 function calculateLogistics(loc1, loc2) {
     const distance = Math.floor(Math.random() * 30) + 5; 
     const transportCost = distance * 25; 
     return { distance, transportCost };
 }
 
-// --- START NEGOTIATION ---
+// ==========================================
+// 5. ROUTES
+// ==========================================
+
+// --- START ---
 router.post('/start', async (req, res) => {
     try {
         const { resourceId, buyerEmail, buyerLocation } = req.body;
@@ -214,7 +135,8 @@ router.post('/start', async (req, res) => {
         await Negotiation.deleteMany({ resourceId, buyerEmail, status: { $ne: 'DEAL_CLOSED' } });
 
         const floorPrice = Math.floor(resource.cost * 0.9); 
-        const sellerEmail = resource.ownerEmail || 'sanikadhumal149@gmail.com';
+        // Using ownerEmail if exists, else fallback
+        const sellerEmail = resource.ownerEmail || VERIFIED_SENDER;
 
         const negotiation = new Negotiation({
             resourceId,
@@ -239,11 +161,10 @@ router.post('/start', async (req, res) => {
     }
 });
 
-// --- NEXT TURN ---
+// --- NEXT TURN (Your "Brain" Logic) ---
 router.post('/next-turn', async (req, res) => {
     try {
         const { negotiationId } = req.body;
-        
         const negotiation = await Negotiation.findById(negotiationId);
         if (!negotiation) return res.status(404).json({ error: "Negotiation lost" });
 
@@ -270,7 +191,10 @@ router.post('/next-turn', async (req, res) => {
             if (logistics.distance > 20) {
                 negotiation.status = 'CANCELLED_DISTANCE';
                 negotiation.distanceKm = logistics.distance;
-                negotiation.logs.push({ sender: 'SYSTEM', message: `DISTANCE ALERT: ${logistics.distance}km (>20km). Auto-Cancelling Deal.` });
+                negotiation.logs.push({
+                    sender: 'SYSTEM',
+                    message: `DISTANCE ALERT: ${logistics.distance}km (>20km). Auto-Cancelling Deal.`
+                });
                 await negotiation.save();
                 return res.json(negotiation);
             }
@@ -279,8 +203,14 @@ router.post('/next-turn', async (req, res) => {
             negotiation.transportCost = logistics.transportCost;
             negotiation.status = 'TRANSPORT_NEGOTIATING';
             
-            negotiation.logs.push({ sender: 'SYSTEM', message: `PHASE 2: LOGISTICS. Distance: ${logistics.distance}km. Standard Rate: ₹${logistics.transportCost}.` });
-            negotiation.logs.push({ sender: 'SELLER_AGENT', message: `The delivery cost is ₹${logistics.transportCost} for ${logistics.distance}km. Shall we proceed?` });
+            negotiation.logs.push({ 
+                sender: 'SYSTEM', 
+                message: `PHASE 2: LOGISTICS. Distance: ${logistics.distance}km. Standard Rate: ₹${logistics.transportCost}.` 
+            });
+            negotiation.logs.push({ 
+                sender: 'SELLER_AGENT', 
+                message: `The delivery cost is ₹${logistics.transportCost} for ${logistics.distance}km. Shall we proceed?` 
+            });
             
             await negotiation.save();
             return res.json(negotiation);
@@ -333,8 +263,11 @@ router.post('/next-turn', async (req, res) => {
             if (isTransportPhase) {
                 if (currentAgent === 'BUYER_AGENT') {
                     const hasAsked = negotiation.logs.some(l => l.sender === 'BUYER_AGENT' && (l.message.includes("discount") || l.message.includes("delivery")));
-                    if (hasAsked) decision = { action: "ACCEPT", price: stdCost, message: "Okay, I accept the delivery charges." };
-                    else decision = { action: "OFFER", price: stdCost, message: "Can you provide a discount on delivery?" };
+                    if (hasAsked) {
+                        decision = { action: "ACCEPT", price: stdCost, message: "Okay, I accept the delivery charges." };
+                    } else {
+                        decision = { action: "OFFER", price: stdCost, message: "Can you provide a discount on delivery?" };
+                    }
                 } else {
                     decision = { action: "OFFER", price: stdCost, message: "Sorry, these are third-party standard rates. We cannot discount." };
                 }
@@ -344,17 +277,22 @@ router.post('/next-turn', async (req, res) => {
                 const lastOffer = negotiation.currentBuyerOffer || 0;
 
                 if (currentAgent === 'BUYER_AGENT') {
-                    if (isFinalOffer || currentAsk <= floor) decision = { action: "ACCEPT", price: currentAsk, message: "Okay, I accept your final price." };
-                    else {
+                    if (isFinalOffer || currentAsk <= floor) {
+                        decision = { action: "ACCEPT", price: currentAsk, message: "Okay, I accept your final price." };
+                    } else {
                         let offer = lastOffer === 0 ? Math.floor(negotiation.initialPrice * 0.85) : Math.min(currentAsk - 2, lastOffer + 5);
                         decision = { action: "OFFER", price: offer, message: `I can offer ₹${offer}.` };
                     }
                 } else {
-                    if (lastOffer >= floor) decision = { action: "ACCEPT", price: lastOffer, message: "Deal accepted." };
-                    else if (currentAsk <= floor) decision = { action: "OFFER", price: floor, message: "I cannot go down below this price. This is last." };
-                    else {
+                    if (lastOffer >= floor) {
+                        decision = { action: "ACCEPT", price: lastOffer, message: "Deal accepted." };
+                    } else if (currentAsk <= floor) {
+                         decision = { action: "OFFER", price: floor, message: "I cannot go down below this price. This is last." };
+                    } else {
                         let nextAsk = Math.max(floor, currentAsk - 5);
-                        decision = { action: "OFFER", price: nextAsk, message: `My best price is ₹${nextAsk}.` };
+                        let msg = `My best price is ₹${nextAsk}.`;
+                        if (nextAsk === floor) msg = `I cannot go down below ₹${nextAsk} rs this is last`;
+                        decision = { action: "OFFER", price: nextAsk, message: msg };
                     }
                 }
             }
@@ -394,7 +332,50 @@ router.post('/next-turn', async (req, res) => {
     }
 });
 
-// --- VERIFY TRANSACTION ---
+// --- SEND APPROVALS (Correct Links to Vercel) ---
+router.post('/send-approvals', async (req, res) => {
+    try {
+        const { negotiationId } = req.body;
+        
+        const negotiation = await Negotiation.findById(negotiationId).populate('resourceId');
+        if (!negotiation) return res.status(404).json({ error: "Negotiation ID not found" });
+
+        // Ensure emails
+        if (!negotiation.sellerEmail) negotiation.sellerEmail = VERIFIED_SENDER;
+        if (!negotiation.buyerEmail) negotiation.buyerEmail = VERIFIED_SENDER;
+        
+        // Generate Token
+        const token = crypto.randomBytes(20).toString('hex');
+        negotiation.confirmationToken = token;
+        negotiation.status = 'WAITING_FOR_APPROVAL'; 
+        
+        await negotiation.save(); 
+
+        // ⚠️ Vercel Frontend URL (so mobile links work)
+        const baseUrl = 'https://omni-circulus.vercel.app';
+        
+        const buyerLink = `${baseUrl}/confirm-deal?token=${token}&role=buyer`;
+        const sellerLink = `${baseUrl}/confirm-deal?token=${token}&role=seller`;
+
+        // Send
+        const success = await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
+        
+        if (success) {
+            negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
+        } else {
+            negotiation.logs.push({ sender: 'SYSTEM', message: "Email delivery failed. Retrying..." });
+        }
+
+        await negotiation.save();
+        res.status(200).json({ success: true, message: "Emails Processed" });
+
+    } catch (err) {
+        console.error("🔥 CRITICAL SERVER ERROR:", err);
+        res.status(500).json({ error: "SERVER_ERROR", message: err.message });
+    }
+});
+
+// --- VERIFY TRANSACTION (Matched to Localhost) ---
 router.post('/verify-transaction', async (req, res) => {
     try {
         const { token, action, role } = req.body; 
@@ -402,8 +383,14 @@ router.post('/verify-transaction', async (req, res) => {
         const negotiation = await Negotiation.findOne({ confirmationToken: token });
         if (!negotiation) return res.status(404).json({ error: "Invalid Token" });
 
+        // Check already closed
         if (['DEAL_CLOSED', 'PAID'].includes(negotiation.status)) {
-            return res.json({ success: true, status: 'ALREADY_CLOSED', message: "Deal already closed.", negotiationId: negotiation._id });
+            return res.json({ 
+                success: true, 
+                status: 'ALREADY_CLOSED', 
+                message: "Deal already closed.", 
+                negotiationId: negotiation._id // ID for Frontend
+            });
         }
 
         if (action === 'reject') {
@@ -416,15 +403,25 @@ router.post('/verify-transaction', async (req, res) => {
         if (role === 'buyer') negotiation.buyerApproval = 'APPROVED';
         if (role === 'seller') negotiation.sellerApproval = 'APPROVED';
 
+        // Check Mutual Approval
         if (negotiation.buyerApproval === 'APPROVED' && negotiation.sellerApproval === 'APPROVED') {
             negotiation.status = 'APPROVED'; 
             negotiation.logs.push({ sender: 'SYSTEM', message: "Both parties APPROVED. Waiting for Payment." });
             await negotiation.save();
-            return res.json({ success: true, status: 'APPROVED', negotiationId: negotiation._id });
+            return res.json({ 
+                success: true, 
+                status: 'APPROVED', 
+                negotiationId: negotiation._id // ID for Frontend to redirect to Payment
+            });
         }
 
         await negotiation.save();
-        res.json({ success: true, status: 'PENDING', message: "Approval Recorded.", negotiationId: negotiation._id });
+        res.json({ 
+            success: true, 
+            status: 'PENDING', 
+            message: "Approval Recorded.", 
+            negotiationId: negotiation._id 
+        });
 
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -454,7 +451,7 @@ router.post('/confirm', async (req, res) => {
     }
 });
 
-// --- HISTORY ENDPOINT ---
+// --- HISTORY ---
 router.get('/history/:email', async (req, res) => {
     try {
         const { email } = req.params;
