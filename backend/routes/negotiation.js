@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer'); 
+const sgMail = require('@sendgrid/mail'); // ✅ CHANGED: Using SendGrid
 require('dotenv').config();
 
 // ==========================================
@@ -60,47 +60,29 @@ const Request = mongoose.models.Request || mongoose.model('Request', new mongoos
 
 
 // ==========================================
-// 📧 2. EMAIL CONFIGURATION (PORT 2525 FIX)
+// 📧 2. SENDGRID CONFIGURATION
 // ==========================================
-const transporter = nodemailer.createTransport({
-  host: 'smtp-relay.brevo.com', // Brevo Server
-  port: 2525,                   // ⚡ FIX: Port 2525 bypasses Render firewalls better than 587
-  secure: false,                // False for 2525
-  auth: {
-    user: 'sanikadhumal149@gmail.com', 
-    pass: process.env.SMTP_PASS // Reads from Render Environment Variable
-  },
-  tls: {
-    rejectUnauthorized: false
-  },
-  // Add timeouts so it doesn't hang forever
-  connectionTimeout: 10000, 
-  greetingTimeout: 10000
-});
-
-// --- CONNECTION TEST ---
-console.log("🔄 SYSTEM: Attempting Email Service Connection on Port 2525...");
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ EMAIL SERVICE ERROR:", error.message);
-  } else {
-    console.log("✅ EMAIL SERVICE READY");
-  }
-});
-
+// Reads SENDGRID_API_KEY from your Render Environment Variables
+if (process.env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    console.log("✅ SENDGRID CONFIGURATION LOADED");
+} else {
+    console.warn("⚠️ WARNING: SENDGRID_API_KEY is missing in .env");
+}
 
 // ==========================================
-// 📧 INTERNAL EMAIL SENDER FUNCTION
+// 📧 INTERNAL EMAIL SENDER FUNCTION (USING SENDGRID)
 // ==========================================
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
-  console.log(`📨 Initiating Email Dispatch...`);
+  console.log(`📨 Initiating Email Dispatch via SendGrid...`);
   
   const itemTitle = negotiation.resourceId?.title || "Resource";
-  
-  // 1. Send Buyer Email
-  await transporter.sendMail({
-    from: '"Omni Agent" <sanikadhumal149@gmail.com>', 
+  const senderEmail = 'sanikadhumal149@gmail.com'; // ⚠️ This email MUST be verified in SendGrid as a Sender
+
+  // 1. Prepare Buyer Email
+  const buyerMsg = {
     to: negotiation.buyerEmail,
+    from: senderEmail, 
     subject: `Action Required: Confirm Purchase for ${itemTitle}`,
     html: `
       <h2>Purchase Confirmation</h2>
@@ -108,24 +90,37 @@ const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
       <p><strong>Location:</strong> ${negotiation.buyerLocation}</p>
       <br/>
       <a href="${buyerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ CONFIRM PURCHASE</a>
+      <p style="margin-top:20px; font-size:12px; color:#666;">If you did not request this, please ignore this email.</p>
     `
-  });
+  };
 
-  // 2. Send Seller Email
-  await transporter.sendMail({
-    from: '"Omni Agent" <sanikadhumal149@gmail.com>', 
+  // 2. Prepare Seller Email
+  const sellerMsg = {
     to: negotiation.sellerEmail,
+    from: senderEmail,
     subject: `Action Required: Approve Sale for ${itemTitle}`,
     html: `
       <h2>Sale Approval</h2>
       <p><strong>Net Payout:</strong> ₹${negotiation.finalPrice}</p>
       <br/>
       <a href="${sellerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ APPROVE SALE</a>
+      <p style="margin-top:20px; font-size:12px; color:#666;">If you did not request this, please ignore this email.</p>
     `
-  });
+  };
 
-  console.log(`✅ Emails successfully sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
-  return true;
+  try {
+      // Send both emails
+      await sgMail.send(buyerMsg);
+      await sgMail.send(sellerMsg);
+      console.log(`✅ Emails successfully sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
+      return true;
+  } catch (error) {
+      console.error("❌ SendGrid Error:", error);
+      if (error.response) {
+          console.error(error.response.body);
+      }
+      throw error; // Re-throw to be caught by the route handler
+  }
 };
 
 // ==========================================
@@ -165,9 +160,9 @@ router.post('/send-approvals', async (req, res) => {
             await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
             negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
         } catch (emailError) {
-            console.error("⚠️ EMAIL FAILED (Network Timeout):", emailError.message);
+            console.error("⚠️ EMAIL FAILED (SendGrid):", emailError.message);
             // Log it for the user, but allow the app to continue
-            negotiation.logs.push({ sender: 'SYSTEM', message: "Email delivery delayed (Network). Deal is Saved." });
+            negotiation.logs.push({ sender: 'SYSTEM', message: "Email delivery failed. Deal is Saved." });
         }
 
         await negotiation.save();
