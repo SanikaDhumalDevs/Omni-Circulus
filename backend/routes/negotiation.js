@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const sgMail = require('@sendgrid/mail'); 
+const nodemailer = require('nodemailer'); 
 require('dotenv').config();
 
 // ==========================================
@@ -58,23 +58,48 @@ const Negotiation = mongoose.models.Negotiation || mongoose.model('Negotiation',
 const Resource = mongoose.models.Resource || mongoose.model('Resource', new mongoose.Schema({}, { strict: false }));
 const Request = mongoose.models.Request || mongoose.model('Request', new mongoose.Schema({}, { strict: false }));
 
-// ==========================================
-// 📧 SENDGRID CONFIGURATION (Render Free Tier Compatible)
-// ==========================================
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-console.log("✅ SendGrid: Email service initialized");
 
 // ==========================================
-// 📧 INTERNAL EMAIL SENDER FUNCTION (SendGrid)
+// 📧 2. EMAIL CONFIGURATION (PORT 2525 FIX)
+// ==========================================
+const transporter = nodemailer.createTransport({
+  host: 'smtp-relay.brevo.com', // Brevo Server
+  port: 2525,                   // ⚡ FIX: Port 2525 bypasses Render firewalls better than 587
+  secure: false,                // False for 2525
+  auth: {
+    user: 'sanikadhumal149@gmail.com', 
+    pass: process.env.SMTP_PASS // Reads from Render Environment Variable
+  },
+  tls: {
+    rejectUnauthorized: false
+  },
+  // Add timeouts so it doesn't hang forever
+  connectionTimeout: 10000, 
+  greetingTimeout: 10000
+});
+
+// --- CONNECTION TEST ---
+console.log("🔄 SYSTEM: Attempting Email Service Connection on Port 2525...");
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ EMAIL SERVICE ERROR:", error.message);
+  } else {
+    console.log("✅ EMAIL SERVICE READY");
+  }
+});
+
+
+// ==========================================
+// 📧 INTERNAL EMAIL SENDER FUNCTION
 // ==========================================
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
-  console.log(`📨 SendGrid: Initiating dispatch to ${negotiation.buyerEmail}`);
+  console.log(`📨 Initiating Email Dispatch...`);
   
   const itemTitle = negotiation.resourceId?.title || "Resource";
   
   // 1. Send Buyer Email
-  await sgMail.send({
-    from: { email: 'sanikadhumal149@gmail.com', name: 'Omni Agent' }, 
+  await transporter.sendMail({
+    from: '"Omni Agent" <sanikadhumal149@gmail.com>', 
     to: negotiation.buyerEmail,
     subject: `Action Required: Confirm Purchase for ${itemTitle}`,
     html: `
@@ -87,8 +112,8 @@ const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
   });
 
   // 2. Send Seller Email
-  await sgMail.send({
-    from: { email: 'sanikadhumal149@gmail.com', name: 'Omni Agent' }, 
+  await transporter.sendMail({
+    from: '"Omni Agent" <sanikadhumal149@gmail.com>', 
     to: negotiation.sellerEmail,
     subject: `Action Required: Approve Sale for ${itemTitle}`,
     html: `
@@ -99,7 +124,7 @@ const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
     `
   });
 
-  console.log(`✅ SendGrid: Emails successfully sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
+  console.log(`✅ Emails successfully sent to ${negotiation.buyerEmail} & ${negotiation.sellerEmail}`);
   return true;
 };
 
@@ -140,7 +165,7 @@ router.post('/send-approvals', async (req, res) => {
             await sendConfirmationEmails(negotiation, buyerLink, sellerLink);
             negotiation.logs.push({ sender: 'SYSTEM', message: "Approval Emails Sent. Waiting for parties..." });
         } catch (emailError) {
-            console.error("⚠️ EMAIL FAILED (SendGrid):", emailError.message);
+            console.error("⚠️ EMAIL FAILED (Network Timeout):", emailError.message);
             // Log it for the user, but allow the app to continue
             negotiation.logs.push({ sender: 'SYSTEM', message: "Email delivery delayed (Network). Deal is Saved." });
         }
@@ -159,6 +184,7 @@ router.post('/send-approvals', async (req, res) => {
         });
     }
 });
+
 
 // ==========================================
 // 🧩 4. YOUR ORIGINAL LOGIC (100% Intact)
