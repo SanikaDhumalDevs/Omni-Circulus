@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const crypto = require('crypto');
-const sgMail = require('@sendgrid/mail'); // ✅ CHANGED: Using SendGrid
+const sgMail = require('@sendgrid/mail'); 
 require('dotenv').config();
 
 // ==========================================
@@ -124,7 +124,7 @@ const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
 };
 
 // ==========================================
-// 🚀 3. THE SEND APPROVALS ROUTE (SAFE MODE)
+// 🚀 3. THE SEND APPROVALS ROUTE (UPDATED FOR VERCEL FRONTEND)
 // ==========================================
 router.post('/send-approvals', async (req, res) => {
     console.log("➡️ ROUTE HIT: /send-approvals");
@@ -151,9 +151,11 @@ router.post('/send-approvals', async (req, res) => {
         
         await negotiation.save(); 
 
-        const baseUrl = 'https://omni-circulus-backend.onrender.com';
-        const buyerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=buyer&token=${token}`;
-        const sellerLink = `${baseUrl}/api/gate/approve?id=${negotiation._id}&role=seller&token=${token}`;
+        // ⚠️ UPDATED: Using your Vercel Frontend URL so it works on mobile
+        const baseUrl = 'https://omni-circulus.vercel.app';
+        
+        const buyerLink = `${baseUrl}/confirm-deal?token=${token}&role=buyer`;
+        const sellerLink = `${baseUrl}/confirm-deal?token=${token}&role=seller`;
 
         // ⚠️ SAFETY BLOCK: Try to send email, but don't crash if it fails
         try {
