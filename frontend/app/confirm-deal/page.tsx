@@ -3,10 +3,10 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation'; 
 
 // ==========================================
-// 1. CONFIGURATION
+// 1. CONFIGURATION (DEPLOYED)
 // ==========================================
 const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
-const FRONTEND_URL = 'https://omni-circulus.vercel.app'; // ✅ Hardcoded for stability
+const FRONTEND_URL = 'https://omni-circulus.vercel.app'; 
 
 function ConfirmContent() {
   const searchParams = useSearchParams();
@@ -47,40 +47,32 @@ function ConfirmContent() {
       }
 
       const data = await res.json();
+      console.log("Verification Result:", data); // Debugging
       
       // ============================================
       // 2. REDIRECT LOGIC
       // ============================================
-      if (data.status === 'APPROVED') {
+      if (data.status === 'APPROVED' || data.status === 'ALREADY_CLOSED' || data.status === 'CLOSED' || data.status === 'PAID') {
         setStatus('CLOSED'); 
-        setMessage('Deal Approved! Redirecting to Payment Gateway...');
+        setMessage('Deal Confirmed! Redirecting to Payment...');
         
-        // Case-insensitive check for buyer role
+        // CHECK: Is the user a buyer?
         if (role && role.toLowerCase().includes('buyer')) {
-            setTimeout(() => {
-                // ✅ Redirect to Production Payment URL with negotiationId
-                window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
-            }, 1500); 
+            // CHECK: Do we have an ID?
+            if (data.negotiationId) {
+                setTimeout(() => {
+                    // ✅ Redirect to Vercel Home with the ID
+                    window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
+                }, 1500); 
+            } else {
+                setMessage("Error: Deal ID missing from server. Cannot open payment.");
+            }
         } else {
-            // Seller -> Dashboard
+            // Seller -> Just go to dashboard
             setTimeout(() => {
                 window.location.href = `${FRONTEND_URL}/`;
             }, 2000);
         }
-      } 
-      else if (['ALREADY_CLOSED', 'CLOSED', 'PAID'].includes(data.status)) {
-        setStatus('CLOSED');
-        setMessage('Transaction already completed.');
-         
-         if (role && role.toLowerCase().includes('buyer') && data.negotiationId) {
-             setTimeout(() => {
-                 window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
-             }, 1500);
-         } else {
-             setTimeout(() => {
-                 window.location.href = `${FRONTEND_URL}/`;
-             }, 2000);
-         }
       } 
       else if (data.status === 'REJECTED') {
         setStatus('REJECTED');

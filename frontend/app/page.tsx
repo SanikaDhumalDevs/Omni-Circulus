@@ -7,7 +7,7 @@ import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import ReplayModal from './components/ReplayModal'; 
 
-// --- CONFIGURATION: LOCALHOST ---
+// --- CONFIGURATION: DEPLOYED ---
 const API_BASE_URL = 'https://omni-circulus-backend.onrender.com'; 
 
 // --- MODALS ---
@@ -224,14 +224,23 @@ export default function Home() {
     }
   }, []);
 
-  // --- AUTOMATIC PAYMENT MODAL LOGIC ---
+  // --- AUTOMATIC PAYMENT MODAL LOGIC (UPDATED) ---
   useEffect(() => {
     const payId = searchParams.get('pay_id');
+    
     if (payId) {
-        if (!selectedOrder) setIsResolvingPayment(true);
+        // Only show loading if we don't have data yet
+        if (!dashboardData) {
+            setIsResolvingPayment(true);
+            return;
+        }
+
         if (user && dashboardData) {
             console.log("Searching for deal:", payId);
-            const dealToPay = dashboardData.shipments.find((s: any) => s.id === payId);
+            
+            // Check both shipments AND sales, and check both id AND _id
+            const dealToPay = dashboardData.shipments.find((s: any) => String(s.id) === String(payId) || String(s._id) === String(payId)) || 
+                              dashboardData.sales.find((s: any) => String(s.id) === String(payId) || String(s._id) === String(payId));
             
             if (dealToPay) {
                 console.log("Deal Found:", dealToPay);
@@ -239,11 +248,14 @@ export default function Home() {
                 setActiveTab('shipments');
                 setSelectedOrder(dealToPay);
                 setShowPayment(true);
-                setIsResolvingPayment(false);
-                router.replace('/'); 
+                
+                // Remove the query param cleanly
+                router.replace('/', { scroll: false }); 
             } else {
-                console.log("Deal NOT found in shipments");
+                console.log("Deal NOT found in loaded data");
             }
+            // Always stop loading once we have checked
+            setIsResolvingPayment(false);
         }
     }
   }, [user, dashboardData, searchParams, router]);
@@ -255,7 +267,7 @@ export default function Home() {
       setDashboardData(json);
     } catch (err) {
       console.error("Dashboard Error:", err);
-      alert(`Connection Failed to ${API_BASE_URL}. Ensure Backend is running.`);
+      // Don't alert here to avoid spamming alerts on initial load
     }
   };
 
@@ -279,10 +291,12 @@ export default function Home() {
   const confirmPayment = async () => {
     setProcessing(true);
     try {
+        // Handle both id and _id
+        const negotiationId = selectedOrder.id || selectedOrder._id;
         const res = await fetch(`${API_BASE_URL}/api/transaction/pay`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ negotiationId: selectedOrder.id })
+            body: JSON.stringify({ negotiationId })
         });
         const data = await res.json();
         if (data.success) {
@@ -291,6 +305,8 @@ export default function Home() {
             fetchDashboardData(user.email);
             setSelectedOrder({ ...selectedOrder, logistics: data.deal.logistics });
             setShowGatePass(true);
+        } else {
+            alert(data.message || "Payment Failed");
         }
     } catch (e) { alert("Payment Failed. Check Server Connection."); } 
     finally { setProcessing(false); }
