@@ -47,12 +47,13 @@ function ConfirmContent() {
       }
 
       const data = await res.json();
-      console.log("Verification Result:", data); // DEBUG: Check console to see if negotiationId exists
+      console.log("Verification Result:", data); // DEBUG
       
       // ============================================
       // 2. REDIRECT LOGIC
       // ============================================
-      if (data.status === 'APPROVED' || data.status === 'ALREADY_CLOSED' || data.status === 'CLOSED' || data.status === 'PAID') {
+      // Checks for all success states (including ALREADY_CLOSED/PAID)
+      if (['APPROVED', 'ALREADY_CLOSED', 'CLOSED', 'PAID'].includes(data.status)) {
         setStatus('CLOSED'); 
         setMessage('Deal Confirmed! Redirecting to Payment...');
         
@@ -60,7 +61,7 @@ function ConfirmContent() {
         const isBuyer = role && role.toLowerCase().trim().includes('buyer');
 
         if (isBuyer) {
-            // ✅ ROBUST ID CHECK: Try negotiationId, then id, then _id
+            // ✅ ROBUST ID CHECK: Try negotiationId first, then standard id
             const payId = data.negotiationId || data.id || data._id;
 
             if (payId) {

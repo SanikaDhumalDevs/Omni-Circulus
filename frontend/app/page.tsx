@@ -7,13 +7,17 @@ import { toPng } from 'html-to-image';
 import jsPDF from 'jspdf';
 import ReplayModal from './components/ReplayModal'; 
 
-// --- CONFIGURATION: DEPLOYED ---
+// ==========================================
+// 1. CONFIGURATION (DEPLOYED)
+// ==========================================
 const API_BASE_URL = 'https://omni-circulus-backend.onrender.com'; 
 
-// --- MODALS ---
+// ==========================================
+// 2. MODALS
+// ==========================================
 
-// 1. PAYMENT MODAL
-const PaymentModal = ({ order, onClose, onConfirm, processing }: any) => (
+// --- PAYMENT MODAL ---
+const PaymentModal = ({ order, onClose, onConfirm, processing }) => (
   <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in-95">
     <div className="bg-slate-900 border border-cyan-500/50 w-full max-w-md rounded-2xl p-6 shadow-2xl relative overflow-hidden">
       <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/20 rounded-full blur-3xl"></div>
@@ -68,8 +72,8 @@ const PaymentModal = ({ order, onClose, onConfirm, processing }: any) => (
   </div>
 );
 
-// 2. GATE PASS MODAL
-const GatePassModal = ({ order, onClose }: any) => {
+// --- GATE PASS MODAL ---
+const GatePassModal = ({ order, onClose }) => {
   const [downloading, setDownloading] = useState(false);
 
   const handleDownloadPdf = async () => {
@@ -144,7 +148,9 @@ const GatePassModal = ({ order, onClose }: any) => {
   );
 };
 
-// --- EXISTING COMPONENTS ---
+// ==========================================
+// 3. UI COMPONENTS
+// ==========================================
 const StatusBadge = () => (
   <div className="hidden md:flex px-3 py-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[10px] md:text-xs font-mono tracking-widest items-center gap-2 shadow-[0_0_10px_rgba(16,185,129,0.2)]">
     <span className="relative flex h-2 w-2">
@@ -155,7 +161,7 @@ const StatusBadge = () => (
   </div>
 );
 
-const GlassCard = ({ title, subtitle, icon, accent, type }: any) => (
+const GlassCard = ({ title, subtitle, icon, accent, type }) => (
   <div className="group relative overflow-hidden flex flex-col justify-between p-8 h-72 w-full rounded-3xl border border-white/10 bg-slate-900/40 backdrop-blur-2xl transition-all duration-500 hover:bg-slate-800/60 hover:-translate-y-2 hover:shadow-[0_0_40px_-10px_rgba(0,0,0,0.7)] cursor-pointer text-left">
     <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-700 bg-gradient-to-br ${accent === 'orange' ? 'from-orange-500 via-amber-500 to-transparent' : 'from-cyan-500 via-blue-500 to-transparent'}`} />
     <div className="relative z-10 w-full flex justify-between items-start">
@@ -173,7 +179,7 @@ const GlassCard = ({ title, subtitle, icon, accent, type }: any) => (
   </div>
 );
 
-const StatCard = ({ label, value, sub, color }: any) => (
+const StatCard = ({ label, value, sub, color }) => (
   <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex flex-col justify-between">
     <div className="text-slate-400 text-[10px] font-mono uppercase tracking-widest">{label}</div>
     <div className="text-2xl font-black text-white tracking-tight my-1">{value}</div>
@@ -181,8 +187,8 @@ const StatCard = ({ label, value, sub, color }: any) => (
   </div>
 );
 
-const StatusPill = ({ status }: { status: string }) => {
-  const styles: any = {
+const StatusPill = ({ status }) => {
+  const styles = {
     AVAILABLE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     NEGOTIATING: "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse",
     SOLD: "bg-red-500/10 text-red-400 border-red-500/20",
@@ -193,21 +199,22 @@ const StatusPill = ({ status }: { status: string }) => {
   return <span className={`px-2 py-1 rounded-md text-[9px] font-mono border ${styles[status] || styles.AVAILABLE}`}>{status}</span>;
 };
 
-// --- MAIN PAGE COMPONENT ---
+// ==========================================
+// 4. MAIN PAGE LOGIC
+// ==========================================
 
 export default function Home() {
-  const [user, setUser] = useState<any>(null);
-  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [user, setUser] = useState(null);
+  const [dashboardData, setDashboardData] = useState(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [activeTab, setActiveTab] = useState('inventory');
   
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [showPayment, setShowPayment] = useState(false);
   const [showGatePass, setShowGatePass] = useState(false);
   
-  // --- REPLAY STATE ---
   const [showReplay, setShowReplay] = useState(false);
-  const [replayId, setReplayId] = useState<string | null>(null);
+  const [replayId, setReplayId] = useState(null);
 
   const [processing, setProcessing] = useState(false);
   const [isResolvingPayment, setIsResolvingPayment] = useState(false);
@@ -215,6 +222,7 @@ export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // 1. Load User on Mount
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -224,7 +232,7 @@ export default function Home() {
     }
   }, []);
 
-  // --- AUTOMATIC PAYMENT MODAL LOGIC (UPDATED) ---
+  // 2. AUTOMATIC PAYMENT REDIRECT LISTENER
   useEffect(() => {
     const payId = searchParams.get('pay_id');
     
@@ -238,21 +246,23 @@ export default function Home() {
         if (user && dashboardData) {
             console.log("Searching for deal:", payId);
             
-            // Check both shipments AND sales, and check both id AND _id
-            const dealToPay = dashboardData.shipments.find((s: any) => String(s.id) === String(payId) || String(s._id) === String(payId)) || 
-                              dashboardData.sales.find((s: any) => String(s.id) === String(payId) || String(s._id) === String(payId));
+            // Check both shipments AND sales, and check both id AND _id for safety
+            const dealToPay = dashboardData.shipments.find((s) => String(s.id) === String(payId) || String(s._id) === String(payId)) || 
+                              dashboardData.sales.find((s) => String(s.id) === String(payId) || String(s._id) === String(payId));
             
             if (dealToPay) {
                 console.log("Deal Found:", dealToPay);
+                
+                // Open Dashboard and Payment Modal
                 setShowDashboard(true);
                 setActiveTab('shipments');
                 setSelectedOrder(dealToPay);
                 setShowPayment(true);
                 
-                // Remove the query param cleanly
+                // Clean the URL so refreshing doesn't re-trigger it
                 router.replace('/', { scroll: false }); 
             } else {
-                console.log("Deal NOT found in loaded data");
+                console.log("Deal NOT found in your dashboard.");
             }
             // Always stop loading once we have checked
             setIsResolvingPayment(false);
@@ -260,14 +270,13 @@ export default function Home() {
     }
   }, [user, dashboardData, searchParams, router]);
 
-  const fetchDashboardData = async (email: string) => {
+  const fetchDashboardData = async (email) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/dashboard/stats?email=${email}`);
       const json = await res.json();
       setDashboardData(json);
     } catch (err) {
       console.error("Dashboard Error:", err);
-      // Don't alert here to avoid spamming alerts on initial load
     }
   };
 
@@ -279,20 +288,14 @@ export default function Home() {
     router.refresh();
   };
 
-  const handlePayClick = (order: any) => { setSelectedOrder(order); setShowPayment(true); };
-  const handleGatePassClick = (order: any) => { setSelectedOrder(order); setShowGatePass(true); };
-  
-  // --- REPLAY HANDLER ---
-  const handleReplayClick = (id: string) => {
-    setReplayId(id);
-    setShowReplay(true);
-  };
+  const handlePayClick = (order) => { setSelectedOrder(order); setShowPayment(true); };
+  const handleGatePassClick = (order) => { setSelectedOrder(order); setShowGatePass(true); };
+  const handleReplayClick = (id) => { setReplayId(id); setShowReplay(true); };
 
   const confirmPayment = async () => {
     setProcessing(true);
     try {
-        // Handle both id and _id
-        const negotiationId = selectedOrder.id || selectedOrder._id;
+        const negotiationId = selectedOrder.id || selectedOrder._id; // Handle both ID types
         const res = await fetch(`${API_BASE_URL}/api/transaction/pay`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -315,6 +318,7 @@ export default function Home() {
   return (
     <main className="relative min-h-screen w-full bg-[#020617] text-white overflow-hidden font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
       
+      {/* Loading Bar for Payment Redirects */}
       {isResolvingPayment && (
           <div className="fixed top-0 left-0 w-full h-1 bg-cyan-500/20 z-[200]"><div className="h-full bg-cyan-400 animate-loading-bar"></div></div>
       )}
@@ -417,8 +421,8 @@ export default function Home() {
                             <tbody className="text-sm divide-y divide-white/5">
                                 {dashboardData.inventory.length > 0 ? (
                                     dashboardData.inventory.map((item: any) => (
-                                        // --- FIXED KEY PROP HERE (Use _id instead of id) ---
-                                        <tr key={item._id} className="hover:bg-white/5">
+                                        // --- FIXED KEY PROP HERE ---
+                                        <tr key={item._id || item.id} className="hover:bg-white/5">
                                             <td className="p-4 font-medium text-white">{item.title}</td>
                                             <td className="p-4 text-slate-400">{item.quantity}</td>
                                             <td className="p-4 text-slate-400">₹{item.cost || item.price}</td>
@@ -436,7 +440,7 @@ export default function Home() {
                         <div className="space-y-3">
                             {dashboardData.shipments.length > 0 ? (
                                 dashboardData.shipments.map((shipment: any) => (
-                                    <div key={shipment.id} className="flex items-center justify-between p-4 rounded-lg bg-blue-900/10 border border-blue-500/10">
+                                    <div key={shipment.id || shipment._id} className="flex items-center justify-between p-4 rounded-lg bg-blue-900/10 border border-blue-500/10">
                                         <div>
                                             <div className="text-white font-bold text-sm">{shipment.title}</div>
                                             <div className="text-blue-400/60 text-[10px] font-mono mt-1">
@@ -445,7 +449,7 @@ export default function Home() {
                                         </div>
                                         
                                         <div className="flex gap-2">
-                                            <button onClick={() => handleReplayClick(shipment.id)} className="px-3 py-2 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px] font-bold tracking-widest rounded transition-all">
+                                            <button onClick={() => handleReplayClick(shipment.id || shipment._id)} className="px-3 py-2 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px] font-bold tracking-widest rounded transition-all">
                                                 🎥 REPLAY
                                             </button>
 
@@ -475,7 +479,7 @@ export default function Home() {
                         <div className="space-y-3">
                             {dashboardData.sales && dashboardData.sales.length > 0 ? (
                                 dashboardData.sales.map((sale: any) => (
-                                    <div key={sale.id} className="flex items-center justify-between p-4 rounded-lg bg-emerald-900/10 border border-emerald-500/10">
+                                    <div key={sale.id || sale._id} className="flex items-center justify-between p-4 rounded-lg bg-emerald-900/10 border border-emerald-500/10">
                                         <div>
                                             <div className="text-white font-bold text-sm">{sale.title}</div>
                                             <div className="text-emerald-400/60 text-[10px] font-mono mt-1">
@@ -486,7 +490,7 @@ export default function Home() {
                                         </div>
                                         
                                         <div className="flex gap-2">
-                                            <button onClick={() => handleReplayClick(sale.id)} className="px-3 py-2 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px] font-bold tracking-widest rounded transition-all">
+                                            <button onClick={() => handleReplayClick(sale.id || sale._id)} className="px-3 py-2 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px] font-bold tracking-widest rounded transition-all">
                                                 🎥 REPLAY
                                             </button>
 
