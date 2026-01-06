@@ -25,7 +25,6 @@ function ConfirmContent() {
       return;
     }
 
-    // Auto-reject if clicked from rejection link
     if (rejectAction) {
       handleDecision('reject');
     }
@@ -42,7 +41,6 @@ function ConfirmContent() {
         body: JSON.stringify({ token, role, action })
       });
 
-      // 1. Capture exact server error if request fails
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({})); 
         throw new Error(errorData.error || `Server Error: ${res.status}`);
@@ -50,19 +48,20 @@ function ConfirmContent() {
 
       const data = await res.json();
       
-      // 2. Handle Success & Redirect
+      // ============================================
+      // 2. CRITICAL REDIRECT LOGIC FOR DEPLOYMENT
+      // ============================================
       if (data.status === 'APPROVED') {
         setStatus('CLOSED'); 
-        setMessage('Deal Approved! Redirecting to Payment...');
+        setMessage('Deal Approved! Redirecting to Payment Gateway...');
         
-        // --- REDIRECT LOGIC ---
         if (role === 'buyer') {
             setTimeout(() => {
-                // Redirects to: https://omni-circulus.vercel.app/?pay_id=12345
+                // ✅ BUYER -> Redirects to Payment Page
                 window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
             }, 1500); 
         } else {
-            // Seller goes to dashboard
+            // ✅ SELLER -> Redirects to Dashboard
             setTimeout(() => {
                 window.location.href = `${FRONTEND_URL}/`;
             }, 2000);
@@ -72,11 +71,15 @@ function ConfirmContent() {
         setStatus('CLOSED');
         setMessage('Transaction already completed.');
          
-         // Redirect buyer if ID exists
+         // ✅ Handle case where user clicks link again after approval
          if (role === 'buyer' && data.negotiationId) {
              setTimeout(() => {
                  window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
              }, 1500);
+         } else {
+             setTimeout(() => {
+                 window.location.href = `${FRONTEND_URL}/`;
+             }, 2000);
          }
       } 
       else if (data.status === 'REJECTED') {
@@ -95,12 +98,10 @@ function ConfirmContent() {
     } catch (err) {
       console.error("Confirmation Error:", err);
       setStatus('ERROR');
-      // 3. Show the REAL error message to the user
       setMessage(err.message || 'Connection Failed');
     }
   };
 
-  // --- RENDER UI ---
   if (status === 'VERIFYING' && !rejectAction) {
     return (
       <div className="flex flex-col items-center gap-6">
@@ -165,7 +166,6 @@ function ConfirmContent() {
              <div className="text-cyan-400 animate-pulse font-mono tracking-widest">CONNECTING TO SECURE LEDGER...</div>
         )}
         
-        {/* ERROR STATE: Shows the actual reason for failure */}
         {status === 'ERROR' && (
              <div className="flex flex-col items-center gap-2">
                  <div className="w-16 h-16 rounded-full bg-red-900/20 border border-red-500 flex items-center justify-center text-red-500 text-2xl">!</div>
