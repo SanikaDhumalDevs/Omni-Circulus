@@ -47,7 +47,7 @@ function ConfirmContent() {
       }
 
       const data = await res.json();
-      console.log("Verification Result:", data); // Debugging
+      console.log("Verification Result:", data); // DEBUG: Check console to see if negotiationId exists
       
       // ============================================
       // 2. REDIRECT LOGIC
@@ -56,15 +56,21 @@ function ConfirmContent() {
         setStatus('CLOSED'); 
         setMessage('Deal Confirmed! Redirecting to Payment...');
         
-        // CHECK: Is the user a buyer?
-        if (role && role.toLowerCase().includes('buyer')) {
-            // CHECK: Do we have an ID?
-            if (data.negotiationId) {
+        // CHECK: Is the user a buyer? (Case insensitive check)
+        const isBuyer = role && role.toLowerCase().trim().includes('buyer');
+
+        if (isBuyer) {
+            // ✅ ROBUST ID CHECK: Try negotiationId, then id, then _id
+            const payId = data.negotiationId || data.id || data._id;
+
+            if (payId) {
+                console.log(`Redirecting to payment for Deal ID: ${payId}`);
                 setTimeout(() => {
-                    // ✅ Redirect to Vercel Home with the ID
-                    window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
+                    // Force redirect to Vercel Home with pay_id
+                    window.location.href = `${FRONTEND_URL}/?pay_id=${payId}`;
                 }, 1500); 
             } else {
+                console.error("ID Missing in response:", data);
                 setMessage("Error: Deal ID missing from server. Cannot open payment.");
             }
         } else {
@@ -90,7 +96,7 @@ function ConfirmContent() {
     } catch (err) {
       console.error("Confirmation Error:", err);
       setStatus('ERROR');
-      setMessage(err.message || 'Connection Failed');
+      setMessage(err.message || 'Connection Failed. Check Backend.');
     }
   };
 
