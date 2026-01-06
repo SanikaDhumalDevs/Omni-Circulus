@@ -115,8 +115,9 @@ export default function AgentPage() {
     }
   }, [negotiation, showNegotiation, isTyping]);
 
-  // 3. --- AUTO-TRIGGER EMAIL LOGIC ---
+  // 3. --- AUTO-TRIGGER EMAIL & REDIRECT LOGIC ---
   useEffect(() => {
+    // A. Auto-Send Emails when Transport Agreed
     if (negotiation?.status === 'TRANSPORT_AGREED' && !emailSentRef.current) {
         console.log("🤖 Agent Auto-Dispatching Emails...");
         emailSentRef.current = true; 
@@ -125,6 +126,16 @@ export default function AgentPage() {
             handleRequestApproval();
         }, 1500);
     }
+
+    // B. ✅ REDIRECT TO PAYMENT WHEN APPROVED
+    if (negotiation?.status === 'APPROVED' && !showSuccess) {
+        setShowSuccess(true);
+        setTimeout(() => {
+            // Forces redirect to the payment modal on home page
+            window.location.href = `/?pay_id=${negotiation._id}`;
+        }, 2000);
+    }
+
   }, [negotiation?.status]);
 
   const handleGPS = () => {
@@ -142,8 +153,10 @@ export default function AgentPage() {
     const processNextTurn = async () => {
       if (!negotiation) return;
       
-      if (['COMPLETED', 'FAILED', 'DEAL_CLOSED', 'CANCELLED_DISTANCE', 'WAITING_FOR_APPROVAL'].includes(negotiation.status)) {
+      // Stop polling if we are in a terminal state or waiting for manual approval
+      if (['COMPLETED', 'FAILED', 'DEAL_CLOSED', 'CANCELLED_DISTANCE', 'WAITING_FOR_APPROVAL', 'APPROVED'].includes(negotiation.status)) {
         setIsTyping(false);
+        // If Approved, we handle the UI in the other useEffect
         return;
       }
       
@@ -192,7 +205,22 @@ export default function AgentPage() {
     if (activeStatuses.includes(negotiation?.status)) { 
         processNextTurn(); 
     } else {
-        setIsTyping(false);
+        // If waiting for approval, we still might want to poll occasionally to check if status changed to APPROVED
+        if (negotiation?.status === 'WAITING_FOR_APPROVAL') {
+             timeoutId = setTimeout(async () => {
+                 try {
+                    const res = await fetch(`${API_BASE_URL}/api/negotiate/next-turn`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ negotiationId: negotiation._id })
+                    });
+                    const data = await res.json();
+                    setNegotiation(data);
+                 } catch (e) {}
+             }, 3000); // Poll every 3 seconds to check for email clicks
+        } else {
+            setIsTyping(false);
+        }
     }
 
     return () => clearTimeout(timeoutId);
@@ -434,7 +462,7 @@ export default function AgentPage() {
                     </div>
                     <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 mt-8 tracking-[0.2em] uppercase">Deal Closed</h2>
                     <p className="text-green-400/70 font-mono mt-2 text-xs tracking-widest">TRANSACTION VERIFIED</p>
-                    <div className="mt-4 text-[10px] text-slate-500 animate-pulse">Redirecting to Dashboard...</div>
+                    <div className="mt-4 text-[10px] text-slate-500 animate-pulse">Redirecting to Payment Gateway...</div>
                 </div>
               )}
 
