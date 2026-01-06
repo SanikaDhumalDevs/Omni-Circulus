@@ -2,11 +2,11 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation'; 
 
-// --- CONFIGURATION ---
-// 1. Point to your LIVE Backend
+// ==========================================
+// 1. PRODUCTION CONFIGURATION
+// ==========================================
 const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
-// 2. Point to your LIVE Frontend (or just use '/' for relative path)
-const FRONTEND_URL = 'https://omni-circulus.vercel.app';
+const FRONTEND_URL = 'https://omni-circulus.vercel.app'; 
 
 function ConfirmContent() {
   const searchParams = useSearchParams();
@@ -21,10 +21,11 @@ function ConfirmContent() {
   useEffect(() => {
     if (!token || !role) {
       setStatus('ERROR');
-      setMessage('Invalid Link parameters.');
+      setMessage('Invalid Link: Missing token or role.');
       return;
     }
 
+    // Auto-reject if clicked from rejection link
     if (rejectAction) {
       handleDecision('reject');
     }
@@ -33,39 +34,45 @@ function ConfirmContent() {
   const handleDecision = async (action) => {
     setStatus('PROCESSING');
     try {
-      // --- ✅ FIXED: Use Production Backend URL ---
+      console.log(`Connecting to: ${API_BASE_URL}/api/negotiate/verify-transaction`);
+      
       const res = await fetch(`${API_BASE_URL}/api/negotiate/verify-transaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, role, action })
       });
 
+      // 1. Capture exact server error if request fails
       if (!res.ok) {
-        throw new Error(`Server responded with ${res.status}`);
+        const errorData = await res.json().catch(() => ({})); 
+        throw new Error(errorData.error || `Server Error: ${res.status}`);
       }
 
       const data = await res.json();
       
-      // --- ✅ FIXED: Redirect to Production Frontend ---
+      // 2. Handle Success & Redirect
       if (data.status === 'APPROVED') {
         setStatus('CLOSED'); 
-        setMessage('Deal Done! Redirecting to Payment Gateway...');
+        setMessage('Deal Approved! Redirecting to Payment...');
         
+        // --- REDIRECT LOGIC ---
         if (role === 'buyer') {
             setTimeout(() => {
-                // Redirect to Live Site Payment
+                // Redirects to: https://omni-circulus.vercel.app/?pay_id=12345
                 window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
             }, 1500); 
         } else {
+            // Seller goes to dashboard
             setTimeout(() => {
                 window.location.href = `${FRONTEND_URL}/`;
             }, 2000);
         }
       } 
-      else if (data.status === 'ALREADY_CLOSED' || data.status === 'CLOSED') {
+      else if (['ALREADY_CLOSED', 'CLOSED', 'PAID'].includes(data.status)) {
         setStatus('CLOSED');
-        setMessage('Transaction Successful! Deal Closed.');
+        setMessage('Transaction already completed.');
          
+         // Redirect buyer if ID exists
          if (role === 'buyer' && data.negotiationId) {
              setTimeout(() => {
                  window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
@@ -77,22 +84,23 @@ function ConfirmContent() {
         setMessage('You have rejected this deal.');
       } 
       else if (data.status === 'PENDING') {
-        setStatus('APPROVED'); // UI State for "Waiting"
-        setMessage('Approval Recorded! Waiting for the other party.');
+        setStatus('APPROVED'); // Reuse APPROVED UI for "Waiting State"
+        setMessage('Approval Recorded. Waiting for partner...');
       } 
       else {
         setStatus('ERROR');
-        setMessage(data.message || 'Unknown State');
+        setMessage(data.message || 'Unknown Status received from server.');
       }
 
     } catch (err) {
       console.error("Confirmation Error:", err);
       setStatus('ERROR');
-      // Updated Error Message
-      setMessage('Network Error: Could not connect to Server.');
+      // 3. Show the REAL error message to the user
+      setMessage(err.message || 'Connection Failed');
     }
   };
 
+  // --- RENDER UI ---
   if (status === 'VERIFYING' && !rejectAction) {
     return (
       <div className="flex flex-col items-center gap-6">
@@ -157,9 +165,14 @@ function ConfirmContent() {
              <div className="text-cyan-400 animate-pulse font-mono tracking-widest">CONNECTING TO SECURE LEDGER...</div>
         )}
         
+        {/* ERROR STATE: Shows the actual reason for failure */}
         {status === 'ERROR' && (
-             <div className="text-red-400 font-mono bg-red-900/20 p-4 rounded border border-red-500/50">
-                ⚠️ {message}
+             <div className="flex flex-col items-center gap-2">
+                 <div className="w-16 h-16 rounded-full bg-red-900/20 border border-red-500 flex items-center justify-center text-red-500 text-2xl">!</div>
+                 <div className="text-red-400 font-mono bg-red-950/50 p-4 rounded border border-red-800 text-sm max-w-xs">
+                    {message}
+                 </div>
+                 <button onClick={() => window.location.reload()} className="mt-4 text-xs text-slate-500 hover:text-white underline">Retry</button>
              </div>
         )}
     </div>
