@@ -1,6 +1,12 @@
 'use client';
 import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation'; // Removed useRouter as we use window.location now
+import { useSearchParams } from 'next/navigation'; 
+
+// --- CONFIGURATION ---
+// 1. Point to your LIVE Backend
+const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
+// 2. Point to your LIVE Frontend (or just use '/' for relative path)
+const FRONTEND_URL = 'https://omni-circulus.vercel.app';
 
 function ConfirmContent() {
   const searchParams = useSearchParams();
@@ -27,8 +33,8 @@ function ConfirmContent() {
   const handleDecision = async (action) => {
     setStatus('PROCESSING');
     try {
-      // --- API CALL TO LOCALHOST BACKEND ---
-      const res = await fetch('http://localhost:5000/api/negotiate/verify-transaction', {
+      // --- ✅ FIXED: Use Production Backend URL ---
+      const res = await fetch(`${API_BASE_URL}/api/negotiate/verify-transaction`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, role, action })
@@ -40,31 +46,29 @@ function ConfirmContent() {
 
       const data = await res.json();
       
-      // --- CRITICAL UPDATE: HARD REDIRECT TO LOCALHOST ---
+      // --- ✅ FIXED: Redirect to Production Frontend ---
       if (data.status === 'APPROVED') {
         setStatus('CLOSED'); 
         setMessage('Deal Done! Redirecting to Payment Gateway...');
         
-        // If the user is the BUYER, redirect to payment immediately
         if (role === 'buyer') {
             setTimeout(() => {
-                // FORCE the browser to go to localhost:3000
-                window.location.href = `http://localhost:3000/?pay_id=${data.negotiationId}`;
+                // Redirect to Live Site Payment
+                window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
             }, 1500); 
         } else {
-            // If seller, just go home
             setTimeout(() => {
-                window.location.href = 'http://localhost:3000/';
+                window.location.href = `${FRONTEND_URL}/`;
             }, 2000);
         }
       } 
       else if (data.status === 'ALREADY_CLOSED' || data.status === 'CLOSED') {
         setStatus('CLOSED');
         setMessage('Transaction Successful! Deal Closed.');
-         // Redirect even if already closed
+         
          if (role === 'buyer' && data.negotiationId) {
              setTimeout(() => {
-                 window.location.href = `http://localhost:3000/?pay_id=${data.negotiationId}`;
+                 window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
              }, 1500);
          }
       } 
@@ -84,7 +88,8 @@ function ConfirmContent() {
     } catch (err) {
       console.error("Confirmation Error:", err);
       setStatus('ERROR');
-      setMessage('Network Error: Ensure Backend is running on port 5000.');
+      // Updated Error Message
+      setMessage('Network Error: Could not connect to Server.');
     }
   };
 
