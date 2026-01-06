@@ -13,7 +13,6 @@ const LogisticsMap = dynamic(() => import('../components/LogisticsMap'), {
 // --- TYPEWRITER COMPONENT ---
 const Typewriter = ({ text, speed = 20 }: { text: string, speed?: number }) => {
   const [displayText, setDisplayText] = useState('');
-  
   useEffect(() => {
     let i = 0;
     const timer = setInterval(() => {
@@ -24,17 +23,15 @@ const Typewriter = ({ text, speed = 20 }: { text: string, speed?: number }) => {
         clearInterval(timer);
       }
     }, speed);
-
     return () => clearInterval(timer);
   }, [text, speed]);
-
   return <span>{displayText}</span>;
 };
 
 export default function AgentPage() {
   const router = useRouter();
   
-  // --- ✅ FIXED: BACKEND CONNECTION URL ---
+  // --- CONFIGURATION ---
   const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
 
   const [user, setUser] = useState<any>(null);
@@ -65,12 +62,10 @@ export default function AgentPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
-  // --- ANIMATION STATE ---
-  const [showSuccess, setShowSuccess] = useState(false);
+  // --- REDIRECT STATE ---
+  const [isRedirecting, setIsRedirecting] = useState(false);
   
   const logsEndRef = useRef<HTMLDivElement>(null); 
-  
-  // --- AUTO-SEND TRACKER ---
   const emailSentRef = useRef(false);
 
   // 1. Load User & Fetch History
@@ -115,25 +110,24 @@ export default function AgentPage() {
     }
   }, [negotiation, showNegotiation, isTyping]);
 
-  // 3. --- AUTO-TRIGGER EMAIL & REDIRECT LOGIC ---
+  // 3. --- AUTO-ACTIONS (EMAIL & REDIRECT) ---
   useEffect(() => {
     // A. Auto-Send Emails when Transport Agreed
     if (negotiation?.status === 'TRANSPORT_AGREED' && !emailSentRef.current) {
         console.log("🤖 Agent Auto-Dispatching Emails...");
         emailSentRef.current = true; 
-        
-        setTimeout(() => {
-            handleRequestApproval();
-        }, 1500);
+        setTimeout(() => { handleRequestApproval(); }, 1500);
     }
 
-    // B. ✅ REDIRECT TO PAYMENT WHEN APPROVED
-    if (negotiation?.status === 'APPROVED' && !showSuccess) {
-        setShowSuccess(true);
+    // B. ✅ REDIRECT LOGIC: IF APPROVED, GO TO HOME PAGE FOR PAYMENT
+    if (negotiation?.status === 'APPROVED' && !isRedirecting) {
+        setIsRedirecting(true);
+        console.log("Deal Approved! Redirecting to Payment...");
+        
         setTimeout(() => {
-            // Forces redirect to the payment modal on home page
+            // Use window.location for hard redirect to ensure Home Page reloads and catches the ID
             window.location.href = `/?pay_id=${negotiation._id}`;
-        }, 2000);
+        }, 1500);
     }
 
   }, [negotiation?.status]);
@@ -153,10 +147,9 @@ export default function AgentPage() {
     const processNextTurn = async () => {
       if (!negotiation) return;
       
-      // Stop polling if we are in a terminal state or waiting for manual approval
+      // Stop polling if terminal state
       if (['COMPLETED', 'FAILED', 'DEAL_CLOSED', 'CANCELLED_DISTANCE', 'WAITING_FOR_APPROVAL', 'APPROVED'].includes(negotiation.status)) {
         setIsTyping(false);
-        // If Approved, we handle the UI in the other useEffect
         return;
       }
       
@@ -171,12 +164,10 @@ export default function AgentPage() {
       }
       
       setIsTyping(true);
-
       const delay = negotiation.logs?.length < 2 ? 1500 : 2500;
 
       timeoutId = setTimeout(async () => {
         try {
-          // ✅ FIXED URL
           const res = await fetch(`${API_BASE_URL}/api/negotiate/next-turn`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -185,10 +176,7 @@ export default function AgentPage() {
           
           if (res.status === 429) {
              setRateLimited(true);
-             timeoutId = setTimeout(() => { 
-                 setRateLimited(false); 
-                 processNextTurn(); 
-             }, 8000);
+             timeoutId = setTimeout(() => { setRateLimited(false); processNextTurn(); }, 8000);
              return;
           }
           if (!res.ok) throw new Error(`Server Error: ${res.status}`);
@@ -204,23 +192,21 @@ export default function AgentPage() {
     const activeStatuses = ['PRICE_NEGOTIATING', 'PRICE_AGREED', 'TRANSPORT_NEGOTIATING'];
     if (activeStatuses.includes(negotiation?.status)) { 
         processNextTurn(); 
+    } else if (negotiation?.status === 'WAITING_FOR_APPROVAL') {
+         // Poll occasionally to check for approval (from email clicks)
+         timeoutId = setTimeout(async () => {
+             try {
+                const res = await fetch(`${API_BASE_URL}/api/negotiate/next-turn`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ negotiationId: negotiation._id })
+                });
+                const data = await res.json();
+                setNegotiation(data);
+             } catch (e) {}
+         }, 3000);
     } else {
-        // If waiting for approval, we still might want to poll occasionally to check if status changed to APPROVED
-        if (negotiation?.status === 'WAITING_FOR_APPROVAL') {
-             timeoutId = setTimeout(async () => {
-                 try {
-                    const res = await fetch(`${API_BASE_URL}/api/negotiate/next-turn`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ negotiationId: negotiation._id })
-                    });
-                    const data = await res.json();
-                    setNegotiation(data);
-                 } catch (e) {}
-             }, 3000); // Poll every 3 seconds to check for email clicks
-        } else {
-            setIsTyping(false);
-        }
+        setIsTyping(false);
     }
 
     return () => clearTimeout(timeoutId);
@@ -229,7 +215,6 @@ export default function AgentPage() {
   // --- API CALLS ---
   const fetchBackgroundAgents = async (email: string) => {
     try {
-      // ✅ FIXED URL
       const res = await fetch(`${API_BASE_URL}/api/agent/my-requests/${email}`);
       const data = await res.json();
       if (Array.isArray(data)) setActiveRequests(data.filter(r => r.status !== 'COMPLETED'));
@@ -238,7 +223,6 @@ export default function AgentPage() {
 
   const fetchHistory = async (email: string) => {
     try {
-      // ✅ FIXED URL
       const res = await fetch(`${API_BASE_URL}/api/negotiate/history/${email}`);
       const data = await res.json();
       setHistory(data);
@@ -250,7 +234,6 @@ export default function AgentPage() {
     setIsActive(true); setFoundDeals([]); setLogs([]); setNegotiation(null);
     setLogs(prev => [...prev, `> REQUEST: "${prompt}"`]);
     try {
-      // ✅ FIXED URL
       const res = await fetch(`${API_BASE_URL}/api/agent/seek`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -278,10 +261,10 @@ export default function AgentPage() {
     if (!buyerLocation && !confirm("Start without GPS? (Logistics will use estimates)")) return;
     
     emailSentRef.current = false; 
+    setIsRedirecting(false); // Reset redirect state
 
     setShowNegotiation(true); setNegotiation(null); setUiPhase('PRICE'); 
     try {
-      // ✅ FIXED URL
       const res = await fetch(`${API_BASE_URL}/api/negotiate/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -296,7 +279,6 @@ export default function AgentPage() {
   const handleRequestApproval = async () => {
     if (!negotiation) return;
     try {
-        // ✅ FIXED URL
         const res = await fetch(`${API_BASE_URL}/api/negotiate/send-approvals`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -347,7 +329,7 @@ export default function AgentPage() {
         </div>
       </header>
 
-      {/* HISTORY MODAL */}
+      {/* HISTORY MODAL (Keep as is) */}
       {showHistory && (
           <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 animate-fade-in-up">
               <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-2xl overflow-hidden max-h-[80vh] flex flex-col shadow-2xl">
@@ -451,8 +433,8 @@ export default function AgentPage() {
            
            <div className="w-full max-w-lg bg-slate-950 border border-cyan-500/50 rounded-2xl overflow-hidden flex flex-col h-[85vh] shadow-[0_0_50px_rgba(8,145,178,0.2)] animate-fade-in-up relative">
               
-              {/* SUCCESS OVERLAY */}
-              {showSuccess && (
+              {/* SUCCESS OVERLAY - REDIRECTING */}
+              {isRedirecting && (
                 <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center animate-fade-in">
                     <div className="relative">
                         <div className="w-32 h-32 rounded-full border-4 border-green-500 animate-ping absolute inset-0 opacity-50"></div>
@@ -460,9 +442,11 @@ export default function AgentPage() {
                              <span className="text-6xl animate-bounce">✅</span>
                         </div>
                     </div>
-                    <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 mt-8 tracking-[0.2em] uppercase">Deal Closed</h2>
-                    <p className="text-green-400/70 font-mono mt-2 text-xs tracking-widest">TRANSACTION VERIFIED</p>
-                    <div className="mt-4 text-[10px] text-slate-500 animate-pulse">Redirecting to Payment Gateway...</div>
+                    <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-600 mt-8 tracking-[0.2em] uppercase">Deal Approved</h2>
+                    <p className="text-green-400/70 font-mono mt-2 text-xs tracking-widest">REDIRECTING TO SECURE PAYMENT...</p>
+                    <div className="mt-4 w-48 h-1 bg-green-900 rounded overflow-hidden">
+                        <div className="h-full bg-green-400 animate-loading-bar"></div>
+                    </div>
                 </div>
               )}
 
@@ -484,7 +468,7 @@ export default function AgentPage() {
                       </div>
                   ) : (
                       <>
-                        {/* --- MAP VISUALIZATION --- */}
+                        {/* MAP (Only if location exists) */}
                         {(uiPhase === 'TRANSPORT' || uiPhase === 'BILL' || uiPhase === 'PENDING_APPROVAL') && negotiation?.buyerLocation?.includes(',') && (
                              <div className="mb-4 animate-fade-in-up">
                                  <LogisticsMap
@@ -492,13 +476,11 @@ export default function AgentPage() {
                                     buyerLng={negotiation.buyerLocation.split(',')[1]}
                                     distanceKm={negotiation.distanceKm || 10}
                                  />
-                                 <div className="text-[9px] text-center text-slate-500 mt-1 uppercase tracking-widest">Real-Time Route Optimization</div>
                              </div>
                         )}
 
                         {(negotiation.logs || []).map((log: any, i: number) => {
                             const isLast = i === negotiation.logs.length - 1;
-
                             if (log.sender === 'SYSTEM') {
                                 return (
                                     <div key={i} className="flex justify-center my-4 animate-fadeIn">
@@ -508,53 +490,34 @@ export default function AgentPage() {
                                     </div>
                                 );
                             }
-
                             return (
                                 <div key={i} className={`flex ${log.sender === 'BUYER_AGENT' ? 'justify-start' : log.sender === 'SELLER_AGENT' ? 'justify-end' : 'justify-center'}`}>
                                     <div className={`max-w-[85%] p-3 rounded-xl border text-xs shadow-md transform transition-all duration-300 ${
                                         log.sender === 'BUYER_AGENT' 
-                                        ? 'bg-cyan-950/40 border-cyan-500/30 text-cyan-100 rounded-tl-none hover:border-cyan-400/50' 
-                                        : 'bg-purple-950/40 border-purple-500/30 text-purple-100 rounded-tr-none hover:border-purple-400/50'
+                                        ? 'bg-cyan-950/40 border-cyan-500/30 text-cyan-100 rounded-tl-none' 
+                                        : 'bg-purple-950/40 border-purple-500/30 text-purple-100 rounded-tr-none'
                                     }`}>
                                         <div className="text-[9px] opacity-50 mb-1 font-bold flex justify-between">
                                             <span>{log.sender.replace('_', ' ')}</span>
                                             {log.offer && <span className="text-white">₹{log.offer}</span>}
                                         </div>
                                         <div className="leading-relaxed font-mono">
-                                            {isLast && log.sender !== 'SYSTEM' && !isTyping ? (
-                                                <Typewriter text={log.message} speed={25} />
-                                            ) : (
-                                                log.message
-                                            )}
+                                            {isLast && log.sender !== 'SYSTEM' && !isTyping ? <Typewriter text={log.message} speed={25} /> : log.message}
                                         </div>
                                     </div>
                                 </div>
                             );
                         })}
                         
-                        {/* --- DYNAMIC TYPING INDICATOR --- */}
-                        {isTyping && (() => {
-                            const lastSender = negotiation.logs?.[negotiation.logs.length - 1]?.sender;
-                            const isSellerThinking = lastSender === 'BUYER_AGENT'; 
-                            
-                            return (
-                                <div className={`flex ${isSellerThinking ? 'justify-end' : 'justify-start'} animate-fade-in-up`}>
-                                    <div className={`
-                                        p-3 rounded-xl text-xs flex gap-1 items-center shadow-lg border
-                                        ${isSellerThinking 
-                                            ? 'bg-purple-950/40 border-purple-500/30 text-purple-100 rounded-tr-none' 
-                                            : 'bg-cyan-950/40 border-cyan-500/30 text-cyan-100 rounded-tl-none'
-                                        }
-                                    `}>
-                                        <div className={`w-1.5 h-1.5 rounded-full animate-bounce ${isSellerThinking ? 'bg-purple-400' : 'bg-cyan-400'}`}></div>
-                                        <div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-100 ${isSellerThinking ? 'bg-purple-400' : 'bg-cyan-400'}`}></div>
-                                        <div className={`w-1.5 h-1.5 rounded-full animate-bounce delay-200 ${isSellerThinking ? 'bg-purple-400' : 'bg-cyan-400'}`}></div>
-                                    </div>
+                        {isTyping && (
+                             <div className="flex justify-start animate-fade-in-up">
+                                <div className="p-3 bg-cyan-950/40 border border-cyan-500/30 rounded-xl rounded-tl-none flex gap-1">
+                                    <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce"></div>
+                                    <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce delay-100"></div>
+                                    <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce delay-200"></div>
                                 </div>
-                            );
-                        })()}
-                        
-                        {rateLimited && <div className="text-center text-[10px] text-yellow-500 animate-pulse mt-4">⚠️ Network Congestion. Retrying in 15s...</div>}
+                             </div>
+                        )}
                         <div ref={logsEndRef} />
                       </>
                   )}
@@ -569,8 +532,6 @@ export default function AgentPage() {
                               <div className="flex justify-between text-slate-400"><span>Transport ({negotiation.distanceKm}km)</span> <span className="text-white font-mono">₹{negotiation.transportCost}</span></div>
                               <div className="border-t border-slate-700 pt-2 mt-2 flex justify-between font-bold text-green-400 text-sm"><span>TOTAL DUE</span> <span>₹{negotiation.totalValue}</span></div>
                           </div>
-                          
-                          {/* AUTO-SENDING UI (Replaces Button) */}
                           <div className="w-full bg-gradient-to-r from-blue-900/50 to-cyan-900/50 text-cyan-400 font-bold py-3 rounded-xl text-xs tracking-widest border border-cyan-800 flex items-center justify-center gap-2 animate-pulse">
                               <span className="w-2 h-2 bg-cyan-400 rounded-full animate-ping"></span>
                               INITIALIZING CONTRACT PROTOCOLS...
@@ -585,7 +546,7 @@ export default function AgentPage() {
                   ) : uiPhase === 'CANCELLED' ? (
                       <div className="bg-red-950/50 p-4 rounded-xl border border-red-900 text-center">
                           <div className="text-red-500 font-bold text-sm mb-1">DEAL CANCELLED</div>
-                          <p className="text-red-400/70 text-[10px]">Distance exceeds limit or Negotiation Failed.</p>
+                          <p className="text-red-400/70 text-[10px]">Negotiation Failed.</p>
                       </div>
                   ) : (
                       <div className="text-center text-[10px] text-slate-500 flex items-center justify-center gap-2 py-2">
