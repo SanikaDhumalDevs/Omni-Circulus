@@ -6,7 +6,7 @@ const sgMail = require('@sendgrid/mail');
 require('dotenv').config();
 
 // ==========================================
-// 1. DEFINE SCHEMA (Your Original Logic)
+// 1. DEFINE SCHEMA (Safe for Serverless)
 // ==========================================
 const negotiationSchemaDef = new mongoose.Schema({
   resourceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Resource', required: true },
@@ -46,6 +46,7 @@ const negotiationSchemaDef = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+// Check if model exists before compiling
 const Negotiation = mongoose.models.Negotiation || mongoose.model('Negotiation', negotiationSchemaDef);
 const Resource = mongoose.models.Resource || mongoose.model('Resource', new mongoose.Schema({}, { strict: false }));
 const Request = mongoose.models.Request || mongoose.model('Request', new mongoose.Schema({}, { strict: false }));
@@ -159,7 +160,7 @@ router.post('/start', async (req, res) => {
     }
 });
 
-// --- NEXT TURN (Your Original Logic) ---
+// --- NEXT TURN ---
 router.post('/next-turn', async (req, res) => {
     try {
         const { negotiationId } = req.body;
@@ -330,7 +331,7 @@ router.post('/next-turn', async (req, res) => {
     }
 });
 
-// --- SEND APPROVALS (Updated for Localhost Testing) ---
+// --- SEND APPROVALS (UPDATED FOR DEPLOYMENT) ---
 router.post('/send-approvals', async (req, res) => {
     try {
         const { negotiationId } = req.body;
@@ -347,9 +348,10 @@ router.post('/send-approvals', async (req, res) => {
         
         await negotiation.save(); 
 
-        // ✅ CHANGE 1: Use LOCALHOST link so you can test it locally.
-        // If you are deploying, only then change this back to https://omni-circulus.vercel.app
-        const baseUrl = 'http://localhost:3000'; 
+        // =============================================
+        // UPDATED: Points to your LIVE Vercel Website
+        // =============================================
+        const baseUrl = 'https://omni-circulus.vercel.app';
         
         const buyerLink = `${baseUrl}/confirm-deal?token=${token}&role=buyer`;
         const sellerLink = `${baseUrl}/confirm-deal?token=${token}&role=seller`;
@@ -371,17 +373,9 @@ router.post('/send-approvals', async (req, res) => {
     }
 });
 
-// ✅ CHANGE 2: Add OPTIONS handler to prevent "Network Error" on Preflight checks
-router.options('/verify-transaction', (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*'); 
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    res.sendStatus(200);
-});
-
 // --- VERIFY TRANSACTION ---
 router.post('/verify-transaction', async (req, res) => {
-    // Add Headers to POST as well
+    // 1. ADD CORS HEADERS EXPLICITLY TO FIX "NETWORK ERROR"
     res.setHeader('Access-Control-Allow-Origin', '*'); 
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -393,6 +387,7 @@ router.post('/verify-transaction', async (req, res) => {
         const negotiation = await Negotiation.findOne({ confirmationToken: token });
         if (!negotiation) return res.status(404).json({ error: "Invalid Token" });
 
+        // 2. Ensure we ALWAYS return negotiationId, even if closed
         if (['DEAL_CLOSED', 'PAID'].includes(negotiation.status)) {
             return res.json({ 
                 success: true, 
@@ -412,11 +407,13 @@ router.post('/verify-transaction', async (req, res) => {
         if (role === 'buyer') negotiation.buyerApproval = 'APPROVED';
         if (role === 'seller') negotiation.sellerApproval = 'APPROVED';
 
+        // Check Mutual Approval
         if (negotiation.buyerApproval === 'APPROVED' && negotiation.sellerApproval === 'APPROVED') {
             negotiation.status = 'APPROVED'; 
             negotiation.logs.push({ sender: 'SYSTEM', message: "Both parties APPROVED. Waiting for Payment." });
             await negotiation.save();
             
+            // 3. Return Success with ID
             return res.json({ 
                 success: true, 
                 status: 'APPROVED', 
@@ -426,6 +423,7 @@ router.post('/verify-transaction', async (req, res) => {
 
         await negotiation.save();
         
+        // 4. Return Pending with ID
         res.json({ 
             success: true, 
             status: 'PENDING', 
