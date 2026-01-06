@@ -3,10 +3,10 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation'; 
 
 // ==========================================
-// 1. PRODUCTION CONFIGURATION
+// 1. CONFIGURATION
 // ==========================================
 const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
-const FRONTEND_URL = 'https://omni-circulus.vercel.app'; 
+const FRONTEND_URL = 'https://omni-circulus.vercel.app'; // ✅ Hardcoded for stability
 
 function ConfirmContent() {
   const searchParams = useSearchParams();
@@ -49,19 +49,20 @@ function ConfirmContent() {
       const data = await res.json();
       
       // ============================================
-      // 2. CRITICAL REDIRECT LOGIC FOR DEPLOYMENT
+      // 2. REDIRECT LOGIC
       // ============================================
       if (data.status === 'APPROVED') {
         setStatus('CLOSED'); 
         setMessage('Deal Approved! Redirecting to Payment Gateway...');
         
-        if (role === 'buyer') {
+        // Case-insensitive check for buyer role
+        if (role && role.toLowerCase().includes('buyer')) {
             setTimeout(() => {
-                // ✅ BUYER -> Redirects to Payment Page
+                // ✅ Redirect to Production Payment URL with negotiationId
                 window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
             }, 1500); 
         } else {
-            // ✅ SELLER -> Redirects to Dashboard
+            // Seller -> Dashboard
             setTimeout(() => {
                 window.location.href = `${FRONTEND_URL}/`;
             }, 2000);
@@ -71,8 +72,7 @@ function ConfirmContent() {
         setStatus('CLOSED');
         setMessage('Transaction already completed.');
          
-         // ✅ Handle case where user clicks link again after approval
-         if (role === 'buyer' && data.negotiationId) {
+         if (role && role.toLowerCase().includes('buyer') && data.negotiationId) {
              setTimeout(() => {
                  window.location.href = `${FRONTEND_URL}/?pay_id=${data.negotiationId}`;
              }, 1500);
@@ -87,7 +87,7 @@ function ConfirmContent() {
         setMessage('You have rejected this deal.');
       } 
       else if (data.status === 'PENDING') {
-        setStatus('APPROVED'); // Reuse APPROVED UI for "Waiting State"
+        setStatus('APPROVED');
         setMessage('Approval Recorded. Waiting for partner...');
       } 
       else {
