@@ -387,13 +387,16 @@ router.post('/verify-transaction', async (req, res) => {
         const negotiation = await Negotiation.findOne({ confirmationToken: token });
         if (!negotiation) return res.status(404).json({ error: "Invalid Token" });
 
-        // 2. Ensure we ALWAYS return negotiationId, even if closed
-        if (['DEAL_CLOSED', 'PAID'].includes(negotiation.status)) {
+        // ✅ CRITICAL FIX: Ensure ID is always a string
+        const safeId = negotiation._id.toString();
+
+        // 2. Ensure we ALWAYS return negotiationId, even if closed or approved
+        if (['DEAL_CLOSED', 'PAID', 'APPROVED'].includes(negotiation.status)) {
             return res.json({ 
                 success: true, 
-                status: 'ALREADY_CLOSED', 
-                message: "Deal already closed.", 
-                negotiationId: negotiation._id 
+                status: negotiation.status === 'APPROVED' ? 'APPROVED' : 'ALREADY_CLOSED', 
+                message: "Deal processed.", 
+                negotiationId: safeId  // <--- Sending String ID
             });
         }
 
@@ -401,11 +404,11 @@ router.post('/verify-transaction', async (req, res) => {
             negotiation.status = 'FAILED';
             negotiation.logs.push({ sender: 'SYSTEM', message: `Deal REJECTED by ${role}.` });
             await negotiation.save();
-            return res.json({ success: true, status: 'REJECTED', negotiationId: negotiation._id });
+            return res.json({ success: true, status: 'REJECTED', negotiationId: safeId });
         }
 
-        if (role === 'buyer') negotiation.buyerApproval = 'APPROVED';
-        if (role === 'seller') negotiation.sellerApproval = 'APPROVED';
+        if (role && role.toLowerCase() === 'buyer') negotiation.buyerApproval = 'APPROVED';
+        if (role && role.toLowerCase() === 'seller') negotiation.sellerApproval = 'APPROVED';
 
         // Check Mutual Approval
         if (negotiation.buyerApproval === 'APPROVED' && negotiation.sellerApproval === 'APPROVED') {
@@ -417,7 +420,7 @@ router.post('/verify-transaction', async (req, res) => {
             return res.json({ 
                 success: true, 
                 status: 'APPROVED', 
-                negotiationId: negotiation._id 
+                negotiationId: safeId 
             });
         }
 
@@ -428,7 +431,7 @@ router.post('/verify-transaction', async (req, res) => {
             success: true, 
             status: 'PENDING', 
             message: "Approval Recorded.", 
-            negotiationId: negotiation._id 
+            negotiationId: safeId 
         });
 
     } catch (err) {
