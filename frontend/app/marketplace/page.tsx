@@ -9,14 +9,10 @@ export default function Marketplace() {
   // Define your backend URL here
   const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
 
-  // 1. Fetch Data from Backend
   useEffect(() => {
-    // Changed localhost to your live backend URL
     fetch(`${API_BASE_URL}/api/resources/all`)
       .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! Status: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
         return res.json();
       })
       .then((data) => {
@@ -57,46 +53,68 @@ export default function Marketplace() {
       {/* THE GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {resources.map((item) => (
-          <div key={item._id} className="group relative bg-slate-900/40 border border-white/10 rounded-2xl p-6 hover:border-cyan-500/50 transition-all duration-300 hover:-translate-y-1">
-            
-            {/* Hover Glow */}
-            <div className="absolute inset-0 bg-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl" />
-
-            {/* Top Row */}
-            <div className="relative z-10 flex justify-between items-start mb-4">
-              <span className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
-                {item.type}
-              </span>
-              <span className="text-[10px] font-mono text-cyan-400">
-                {new Date(item.createdAt).toLocaleDateString()}
-              </span>
-            </div>
-
-            {/* Content */}
-            <div className="relative z-10">
-              <h3 className="text-xl font-bold text-white mb-1 group-hover:text-cyan-400 transition-colors">
-                {item.title}
-              </h3>
-              <p className="text-slate-400 text-sm mb-4 line-clamp-2">
-                {item.description || "No description provided."}
-              </p>
+          // WRAPPED IN LINK FOR NAVIGATION
+          <Link href={`/resource/${item._id}`} key={item._id} className="block group">
+            <div className="relative bg-slate-900/40 border border-white/10 rounded-2xl overflow-hidden hover:border-cyan-500/50 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
               
-              {/* Footer Data */}
-              <div className="flex items-center gap-4 text-xs font-mono text-slate-500 border-t border-white/5 pt-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  {item.location}
+              {/* Hover Glow */}
+              <div className="absolute inset-0 bg-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+
+              {/* --- IMAGE SECTION --- */}
+              <div className="h-48 w-full bg-slate-950 border-b border-white/5 relative">
+                {item.imageUrl ? (
+                  <img 
+                    src={item.imageUrl} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                  />
+                ) : (
+                  // PLACEHOLDER IF NO IMAGE
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-950/50">
+                    <svg className="w-8 h-8 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-[10px] font-mono tracking-widest uppercase">Image Data Corrupted</span>
+                  </div>
+                )}
+                
+                {/* Price Badge Overlay */}
+                <div className="absolute top-4 right-4 bg-black/80 backdrop-blur border border-green-500/30 text-green-400 px-3 py-1 rounded text-sm font-mono font-bold">
+                   ₹{item.cost ? item.cost.toLocaleString() : 'NEGOTIABLE'}
                 </div>
-                <div>QTY: {item.quantity}</div>
               </div>
+
+              {/* --- CONTENT SECTION --- */}
+              <div className="p-6 flex-1 flex flex-col">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+                    {item.type}
+                  </span>
+                  <span className="text-[10px] font-mono text-cyan-400">
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">
+                  {item.title}
+                </h3>
+                
+                <p className="text-slate-400 text-sm mb-4 line-clamp-2 flex-1">
+                  {item.description || "No technical specifications provided."}
+                </p>
+                
+                {/* Footer Data */}
+                <div className="flex items-center justify-between text-xs font-mono text-slate-500 border-t border-white/5 pt-4 mt-auto">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                    <span className="truncate max-w-[120px]">{item.location}</span>
+                  </div>
+                  <div className="text-slate-300">QTY: <span className="text-white font-bold">{item.quantity}</span></div>
+                </div>
+              </div>
+
             </div>
-
-            {/* Claim Button (Fake for now) */}
-            <button className="absolute bottom-6 right-6 p-2 rounded-lg bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-black transition-all opacity-0 group-hover:opacity-100">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-            </button>
-
-          </div>
+          </Link>
         ))}
       </div>
       
