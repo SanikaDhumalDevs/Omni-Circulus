@@ -17,7 +17,7 @@ const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
 // ==========================================
 
 // --- PAYMENT MODAL ---
-const PaymentModal = ({ order, onClose, onConfirm, processing }) => (
+const PaymentModal = ({ order, onClose, onConfirm, processing }: any) => (
   <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in-95">
     <div className="bg-slate-900 border border-cyan-500/50 w-full max-w-md rounded-2xl p-6 shadow-2xl relative overflow-hidden">
       <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/20 rounded-full blur-3xl"></div>
@@ -73,7 +73,7 @@ const PaymentModal = ({ order, onClose, onConfirm, processing }) => (
 );
 
 // --- GATE PASS MODAL ---
-const GatePassModal = ({ order, onClose }) => {
+const GatePassModal = ({ order, onClose }: any) => {
   const [downloading, setDownloading] = useState(false);
 
   const handleDownloadPdf = async () => {
@@ -105,8 +105,8 @@ const GatePassModal = ({ order, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in zoom-in-95">
-      <div id="gate-pass-card" className="bg-white text-black w-full max-w-sm rounded-3xl overflow-hidden shadow-[0_0_100px_rgba(255,255,255,0.2)] relative">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in zoom-in-95 overflow-y-auto">
+      <div id="gate-pass-card" className="bg-white text-black w-full max-w-sm rounded-3xl overflow-hidden shadow-[0_0_100px_rgba(255,255,255,0.2)] relative my-auto">
          <div className="bg-slate-900 text-white p-6 text-center">
             <h2 className="text-xl font-black tracking-widest">OMNI PASS</h2>
             <p className="text-[10px] text-cyan-400 uppercase tracking-[0.3em]">Gate Access Control</p>
@@ -161,7 +161,7 @@ const StatusBadge = () => (
   </div>
 );
 
-const GlassCard = ({ title, subtitle, icon, accent, type }) => (
+const GlassCard = ({ title, subtitle, icon, accent, type }: any) => (
   <div className="group relative overflow-hidden flex flex-col justify-between p-8 h-72 w-full rounded-3xl border border-white/10 bg-slate-900/40 backdrop-blur-2xl transition-all duration-500 hover:bg-slate-800/60 hover:-translate-y-2 hover:shadow-[0_0_40px_-10px_rgba(0,0,0,0.7)] cursor-pointer text-left">
     <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-700 bg-gradient-to-br ${accent === 'orange' ? 'from-orange-500 via-amber-500 to-transparent' : 'from-cyan-500 via-blue-500 to-transparent'}`} />
     <div className="relative z-10 w-full flex justify-between items-start">
@@ -179,7 +179,7 @@ const GlassCard = ({ title, subtitle, icon, accent, type }) => (
   </div>
 );
 
-const StatCard = ({ label, value, sub, color }) => (
+const StatCard = ({ label, value, sub, color }: any) => (
   <div className="p-4 rounded-xl border border-white/10 bg-white/5 flex flex-col justify-between">
     <div className="text-slate-400 text-[10px] font-mono uppercase tracking-widest">{label}</div>
     <div className="text-2xl font-black text-white tracking-tight my-1">{value}</div>
@@ -187,8 +187,8 @@ const StatCard = ({ label, value, sub, color }) => (
   </div>
 );
 
-const StatusPill = ({ status }) => {
-  const styles = {
+const StatusPill = ({ status }: { status: string }) => {
+  const styles: any = {
     AVAILABLE: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     NEGOTIATING: "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse",
     SOLD: "bg-red-500/10 text-red-400 border-red-500/20",
@@ -204,17 +204,17 @@ const StatusPill = ({ status }) => {
 // ==========================================
 
 export default function Home() {
-  const [user, setUser] = useState(null);
-  const [dashboardData, setDashboardData] = useState(null);
+  const [user, setUser] = useState<any>(null);
+  const [dashboardData, setDashboardData] = useState<any>(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [activeTab, setActiveTab] = useState('inventory');
   
-  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [showPayment, setShowPayment] = useState(false);
   const [showGatePass, setShowGatePass] = useState(false);
   
   const [showReplay, setShowReplay] = useState(false);
-  const [replayId, setReplayId] = useState(null);
+  const [replayId, setReplayId] = useState<string | null>(null);
 
   const [processing, setProcessing] = useState(false);
   const [isResolvingPayment, setIsResolvingPayment] = useState(false);
@@ -237,40 +237,39 @@ export default function Home() {
     const payId = searchParams.get('pay_id');
     
     if (payId) {
-        // Only show loading if we don't have data yet
-        if (!dashboardData) {
-            setIsResolvingPayment(true);
+        setIsResolvingPayment(true);
+        
+        const storedUser = localStorage.getItem('user');
+        if (!storedUser) {
+            alert("⚠️ Please Login to continue.");
+            setIsResolvingPayment(false);
+            router.push('/auth'); 
             return;
         }
 
         if (user && dashboardData) {
             console.log("Searching for deal:", payId);
             
-            // Check both shipments AND sales, and check both id AND _id for safety
-            const dealToPay = dashboardData.shipments.find((s) => String(s.id) === String(payId) || String(s._id) === String(payId)) || 
-                              dashboardData.sales.find((s) => String(s.id) === String(payId) || String(s._id) === String(payId));
+            setShowDashboard(true);
+            setActiveTab('shipments'); 
+            
+            const dealToPay = dashboardData.shipments.find((s: any) => String(s.id) === String(payId) || String(s._id) === String(payId)) || 
+                              dashboardData.sales.find((s: any) => String(s.id) === String(payId) || String(s._id) === String(payId));
             
             if (dealToPay) {
                 console.log("Deal Found:", dealToPay);
-                
-                // Open Dashboard and Payment Modal
-                setShowDashboard(true);
-                setActiveTab('shipments');
                 setSelectedOrder(dealToPay);
                 setShowPayment(true);
-                
-                // Clean the URL so refreshing doesn't re-trigger it
                 router.replace('/', { scroll: false }); 
             } else {
-                console.log("Deal NOT found in your dashboard.");
+                console.log("Deal NOT found in loaded data.");
             }
-            // Always stop loading once we have checked
             setIsResolvingPayment(false);
         }
     }
   }, [user, dashboardData, searchParams, router]);
 
-  const fetchDashboardData = async (email) => {
+  const fetchDashboardData = async (email: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/dashboard/stats?email=${email}`);
       const json = await res.json();
@@ -288,14 +287,14 @@ export default function Home() {
     router.refresh();
   };
 
-  const handlePayClick = (order) => { setSelectedOrder(order); setShowPayment(true); };
-  const handleGatePassClick = (order) => { setSelectedOrder(order); setShowGatePass(true); };
-  const handleReplayClick = (id) => { setReplayId(id); setShowReplay(true); };
+  const handlePayClick = (order: any) => { setSelectedOrder(order); setShowPayment(true); };
+  const handleGatePassClick = (order: any) => { setSelectedOrder(order); setShowGatePass(true); };
+  const handleReplayClick = (id: string) => { setReplayId(id); setShowReplay(true); };
 
   const confirmPayment = async () => {
     setProcessing(true);
     try {
-        const negotiationId = selectedOrder.id || selectedOrder._id; // Handle both ID types
+        const negotiationId = selectedOrder.id || selectedOrder._id; 
         const res = await fetch(`${API_BASE_URL}/api/transaction/pay`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -318,7 +317,6 @@ export default function Home() {
   return (
     <main className="relative min-h-screen w-full bg-[#020617] text-white overflow-hidden font-sans selection:bg-cyan-500/30 selection:text-cyan-100">
       
-      {/* Loading Bar for Payment Redirects */}
       {isResolvingPayment && (
           <div className="fixed top-0 left-0 w-full h-1 bg-cyan-500/20 z-[200]"><div className="h-full bg-cyan-400 animate-loading-bar"></div></div>
       )}
@@ -349,12 +347,12 @@ export default function Home() {
               <div className="text-right hidden sm:block">
                 <div className="text-xs text-white font-bold uppercase tracking-wider">{user.username}</div>
               </div>
-              <button onClick={handleLogout} className="text-xs text-red-400 hover:text-white border border-red-900/30 bg-red-900/10 px-4 py-2 rounded-lg hover:bg-red-600 transition-all">DISCONNECT</button>
+              <button onClick={handleLogout} className="text-xs text-red-400 hover:text-white border border-red-900/30 bg-red-900/10 px-3 py-2 rounded-lg hover:bg-red-600 transition-all">EXIT</button>
             </div>
           ) : (
             <div className="flex items-center gap-4 border-l border-white/10 pl-6">
               <Link href="/auth"><button className="text-xs text-slate-400 hover:text-white font-mono tracking-wider transition-colors">LOGIN</button></Link>
-              <Link href="/auth"><button className="text-xs bg-cyan-600 hover:bg-cyan-500 text-black font-bold px-5 py-2 rounded-lg tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all">JOIN NETWORK</button></Link>
+              <Link href="/auth"><button className="text-xs bg-cyan-600 hover:bg-cyan-500 text-black font-bold px-5 py-2 rounded-lg tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all">JOIN</button></Link>
             </div>
           )}
         </div>
@@ -365,7 +363,7 @@ export default function Home() {
           <span className="block text-white">RESOURCE</span>
           <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 animate-gradient">INTELLIGENCE</span>
         </h1>
-        <div className="grid md:grid-cols-2 gap-8 w-full max-w-5xl px-4 pb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl px-4 pb-12">
           <Link href={user ? "/give" : "/auth"} className="w-full">
             <GlassCard type="Supplier" accent="orange" title="I Have Stock" subtitle="Upload a photo of your leftovers. AI identifies and lists it." icon={<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>} />
           </Link>
@@ -382,26 +380,26 @@ export default function Home() {
       {showReplay && replayId && <ReplayModal dealId={replayId} onClose={() => setShowReplay(false)} />}
 
       {showDashboard && user && dashboardData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 md:p-4">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md transition-opacity duration-300" onClick={() => setShowDashboard(false)}></div>
-          <div className="relative bg-[#0f172a] border border-cyan-500/30 w-full max-w-4xl rounded-2xl shadow-[0_0_50px_rgba(6,182,212,0.2)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+          <div className="relative bg-[#0f172a] border border-cyan-500/30 w-full max-w-4xl rounded-2xl shadow-[0_0_50px_rgba(6,182,212,0.2)] overflow-hidden animate-in fade-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
             
-            <div className="flex justify-between items-center p-6 border-b border-white/10 bg-slate-900/50">
+            <div className="flex justify-between items-center p-4 md:p-6 border-b border-white/10 bg-slate-900/50">
                 <div className="flex items-center gap-3">
                     <div className="h-3 w-3 rounded-full bg-cyan-500 animate-pulse"></div>
-                    <h2 className="text-xl font-bold tracking-widest text-white">COMMAND CENTER</h2>
+                    <h2 className="text-lg md:text-xl font-bold tracking-widest text-white">COMMAND CENTER</h2>
                 </div>
                 <button onClick={() => setShowDashboard(false)} className="text-slate-400 hover:text-white transition-colors">✕</button>
             </div>
 
-            <div className="p-6 md:p-8 max-h-[70vh] overflow-y-auto">
+            <div className="p-4 md:p-8 overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                     <StatCard label="Total Revenue" value={`₹${dashboardData.stats.revenue.toLocaleString()}`} sub="Credits Earned" color="text-emerald-400" />
                     <StatCard label="Total Spend" value={`₹${dashboardData.stats.spend.toLocaleString()}`} sub="Credits Used" color="text-blue-400" />
                     <StatCard label="Active Missions" value={dashboardData.stats.active} sub="Ongoing Negotiations" color="text-amber-400" />
                 </div>
 
-                <div className="flex gap-6 border-b border-white/10 mb-6">
+                <div className="flex gap-6 border-b border-white/10 mb-6 overflow-x-auto whitespace-nowrap pb-2">
                     <button onClick={() => setActiveTab('inventory')} className={`pb-3 text-xs font-bold tracking-widest transition-all ${activeTab === 'inventory' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}>MY INVENTORY</button>
                     <button onClick={() => setActiveTab('shipments')} className={`pb-3 text-xs font-bold tracking-widest transition-all ${activeTab === 'shipments' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}>INCOMING SHIPMENTS</button>
                     <button onClick={() => setActiveTab('sales')} className={`pb-3 text-xs font-bold tracking-widest transition-all ${activeTab === 'sales' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}>MY SALES</button>
@@ -409,38 +407,39 @@ export default function Home() {
 
                 <div className="min-h-[200px]">
                     {activeTab === 'inventory' && (
-                        <table className="w-full text-left border-collapse">
-                            <thead className="bg-white/5 text-[9px] uppercase text-slate-400 font-mono tracking-wider">
-                                <tr>
-                                    <th className="p-4 rounded-tl-lg">Item</th>
-                                    <th className="p-4">Qty</th>
-                                    <th className="p-4">Price</th>
-                                    <th className="p-4 rounded-tr-lg">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="text-sm divide-y divide-white/5">
-                                {dashboardData.inventory.length > 0 ? (
-                                    dashboardData.inventory.map((item: any) => (
-                                        // --- FIXED KEY PROP HERE ---
-                                        <tr key={item._id || item.id} className="hover:bg-white/5">
-                                            <td className="p-4 font-medium text-white">{item.title}</td>
-                                            <td className="p-4 text-slate-400">{item.quantity}</td>
-                                            <td className="p-4 text-slate-400">₹{item.cost || item.price}</td>
-                                            <td className="p-4"><StatusPill status={item.status} /></td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr><td colSpan={4} className="p-8 text-center text-slate-500 font-mono text-xs">NO INVENTORY</td></tr>
-                                )}
-                            </tbody>
-                        </table>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse min-w-[500px]">
+                                <thead className="bg-white/5 text-[9px] uppercase text-slate-400 font-mono tracking-wider">
+                                    <tr>
+                                        <th className="p-4 rounded-tl-lg">Item</th>
+                                        <th className="p-4">Qty</th>
+                                        <th className="p-4">Price</th>
+                                        <th className="p-4 rounded-tr-lg">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-sm divide-y divide-white/5">
+                                    {dashboardData.inventory.length > 0 ? (
+                                        dashboardData.inventory.map((item: any) => (
+                                            <tr key={item._id || item.id} className="hover:bg-white/5">
+                                                <td className="p-4 font-medium text-white">{item.title}</td>
+                                                <td className="p-4 text-slate-400">{item.quantity}</td>
+                                                <td className="p-4 text-slate-400">₹{item.cost || item.price}</td>
+                                                <td className="p-4"><StatusPill status={item.status} /></td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr><td colSpan={4} className="p-8 text-center text-slate-500 font-mono text-xs">NO INVENTORY</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
 
                     {activeTab === 'shipments' && (
                         <div className="space-y-3">
                             {dashboardData.shipments.length > 0 ? (
                                 dashboardData.shipments.map((shipment: any) => (
-                                    <div key={shipment.id || shipment._id} className="flex items-center justify-between p-4 rounded-lg bg-blue-900/10 border border-blue-500/10">
+                                    <div key={shipment.id || shipment._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-lg bg-blue-900/10 border border-blue-500/10 gap-4">
                                         <div>
                                             <div className="text-white font-bold text-sm">{shipment.title}</div>
                                             <div className="text-blue-400/60 text-[10px] font-mono mt-1">
@@ -448,21 +447,21 @@ export default function Home() {
                                             </div>
                                         </div>
                                         
-                                        <div className="flex gap-2">
-                                            <button onClick={() => handleReplayClick(shipment.id || shipment._id)} className="px-3 py-2 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px] font-bold tracking-widest rounded transition-all">
+                                        <div className="flex gap-2 w-full sm:w-auto">
+                                            <button onClick={() => handleReplayClick(shipment.id || shipment._id)} className="flex-1 sm:flex-none px-3 py-2 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px] font-bold tracking-widest rounded transition-all">
                                                 🎥 REPLAY
                                             </button>
 
                                             {shipment.status === 'PAID' ? (
-                                                <button onClick={() => handleGatePassClick(shipment)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold tracking-widest rounded shadow-lg transition-colors flex items-center gap-2 animate-pulse">
+                                                <button onClick={() => handleGatePassClick(shipment)} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold tracking-widest rounded shadow-lg transition-colors flex justify-center items-center gap-2 animate-pulse">
                                                     GATE PASS
                                                 </button>
                                             ) : ['APPROVED', 'TRANSPORT_AGREED', 'WAITING_FOR_PAYMENT'].includes(shipment.status) ? (
-                                                <button onClick={() => handlePayClick(shipment)} className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-[10px] font-bold tracking-widest rounded shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all flex items-center gap-2">
+                                                <button onClick={() => handlePayClick(shipment)} className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-[10px] font-bold tracking-widest rounded shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all flex justify-center items-center gap-2">
                                                     PAY NOW
                                                 </button>
                                             ) : (
-                                                <button className="px-4 py-1.5 bg-slate-700 text-slate-400 text-[10px] font-bold tracking-widest rounded cursor-not-allowed">
+                                                <button className="flex-1 sm:flex-none px-4 py-1.5 bg-slate-700 text-slate-400 text-[10px] font-bold tracking-widest rounded cursor-not-allowed">
                                                     {shipment.status}
                                                 </button>
                                             )}
@@ -479,7 +478,7 @@ export default function Home() {
                         <div className="space-y-3">
                             {dashboardData.sales && dashboardData.sales.length > 0 ? (
                                 dashboardData.sales.map((sale: any) => (
-                                    <div key={sale.id || sale._id} className="flex items-center justify-between p-4 rounded-lg bg-emerald-900/10 border border-emerald-500/10">
+                                    <div key={sale.id || sale._id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-lg bg-emerald-900/10 border border-emerald-500/10 gap-4">
                                         <div>
                                             <div className="text-white font-bold text-sm">{sale.title}</div>
                                             <div className="text-emerald-400/60 text-[10px] font-mono mt-1">
@@ -489,17 +488,17 @@ export default function Home() {
                                             </div>
                                         </div>
                                         
-                                        <div className="flex gap-2">
-                                            <button onClick={() => handleReplayClick(sale.id || sale._id)} className="px-3 py-2 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px] font-bold tracking-widest rounded transition-all">
+                                        <div className="flex gap-2 w-full sm:w-auto">
+                                            <button onClick={() => handleReplayClick(sale.id || sale._id)} className="flex-1 sm:flex-none px-3 py-2 bg-purple-900/30 hover:bg-purple-900/50 text-purple-300 border border-purple-500/30 text-[10px] font-bold tracking-widest rounded transition-all">
                                                 🎥 REPLAY
                                             </button>
 
                                             {sale.status === 'PAID' ? (
-                                                <button onClick={() => handleGatePassClick(sale)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold tracking-widest rounded shadow-lg transition-colors flex items-center gap-2 animate-pulse">
+                                                <button onClick={() => handleGatePassClick(sale)} className="flex-1 sm:flex-none px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold tracking-widest rounded shadow-lg transition-colors flex justify-center items-center gap-2 animate-pulse">
                                                     GATE PASS
                                                 </button>
                                             ) : (
-                                                <div className="px-3 py-1.5 bg-amber-900/20 text-amber-400 border border-amber-500/30 text-[9px] font-bold tracking-widest rounded">
+                                                <div className="px-3 py-1.5 bg-amber-900/20 text-amber-400 border border-amber-500/30 text-[9px] font-bold tracking-widest rounded text-center w-full sm:w-auto">
                                                     PENDING
                                                 </div>
                                             )}
