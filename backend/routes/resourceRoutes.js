@@ -6,7 +6,7 @@ const Request = require('../models/Request');
 // POST: Add a new Resource (And check for waiting Agents)
 router.post('/add', async (req, res) => {
   try {
-    // 1. EXTRACT DATA - Added 'imageUrl' to destructuring
+    // 1. EXTRACT DATA 
     const { 
       title, 
       description, 
@@ -15,7 +15,7 @@ router.post('/add', async (req, res) => {
       location, 
       ownerEmail, 
       cost, 
-      imageUrl // <--- FIX 1: Read the image from the request
+      imageUrl 
     } = req.body;
 
     // 2. Generate Tags
@@ -32,7 +32,7 @@ router.post('/add', async (req, res) => {
       tags: generatedTags,
       cost: cost || 0, 
       ownerEmail: ownerEmail,
-      imageUrl: imageUrl // <--- FIX 2: Pass the image to the database model
+      imageUrl: imageUrl 
     });
 
     const savedResource = await newResource.save();
@@ -56,7 +56,7 @@ router.post('/add', async (req, res) => {
 
     res.status(201).json(savedResource);
   } catch (err) {
-    console.error("Error adding resource:", err); // Added better error logging
+    console.error("Error adding resource:", err); 
     res.status(500).json(err);
   }
 });
@@ -64,19 +64,22 @@ router.post('/add', async (req, res) => {
 // GET: Get all Resources
 router.get('/all', async (req, res) => {
   try {
-    const resources = await Resource.find({ status: 'Available' });
+    // UPDATED: Removed { status: 'Available' } filter.
+    // We now fetch ALL resources so the frontend can display 'Sold' items with the grey effect.
+    const resources = await Resource.find().sort({ createdAt: -1 });
     res.status(200).json(resources);
   } catch (err) {
     res.status(500).json(err);
   }
 });
 
-// PUT: Claim a Resource
+// PUT: Mark a Resource as Sold
 router.put('/claim/:id', async (req, res) => {
   try {
     const updatedResource = await Resource.findByIdAndUpdate(
       req.params.id, 
-      { status: 'Claimed' }, 
+      // UPDATED: Changed 'Claimed' to 'Sold' to match your Model Schema
+      { status: 'Sold' }, 
       { new: true }
     );
     res.status(200).json(updatedResource);
