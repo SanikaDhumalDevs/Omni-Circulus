@@ -161,17 +161,36 @@ const StatusBadge = () => (
   </div>
 );
 
-// --- NEW SCANNER BUTTON COMPONENT ---
+// --- UPDATED: ANIMATED SCANNER BUTTON ---
 const ScannerLink = () => (
-  <Link href="/scanner" className="group relative flex items-center justify-center p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-cyan-500/10 hover:border-cyan-500/50 hover:text-cyan-400 text-slate-400 transition-all duration-300">
-    {/* High Quality Scan Viewfinder Icon */}
-    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h4v2H5v4H3V3zm18 0h-4v2h2v4h2V3zM3 21h4v-2H5v-4H3v6zm18 0h-4v-2h2v-4h2v6zM8 12h8m-4-4v8" /> 
-    </svg>
+  <Link href="/scanner" className="group relative flex items-center justify-center p-2 rounded-xl border border-cyan-500/30 bg-cyan-950/20 hover:bg-cyan-900/40 text-cyan-400 transition-all duration-300 hover:shadow-[0_0_15px_rgba(34,211,238,0.3)] hover:border-cyan-400/50">
+    <div className="relative w-6 h-6 flex items-center justify-center overflow-hidden">
+        {/* Frame Icon */}
+        <svg className="w-full h-full opacity-80 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2" />
+        </svg>
+        
+        {/* Animated Laser Line */}
+        <div className="absolute top-0 left-0 w-full h-0.5 bg-cyan-400 shadow-[0_0_5px_#22d3ee] opacity-0 group-hover:opacity-100 animate-scanner-line" />
+    </div>
+
     {/* Tooltip */}
-    <div className="absolute top-full mt-3 right-0 px-3 py-1.5 bg-slate-900 border border-white/20 text-[9px] font-bold text-white tracking-widest whitespace-nowrap rounded-lg shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all pointer-events-none z-50">
+    <div className="absolute top-full mt-4 right-0 px-3 py-1.5 bg-slate-900 border border-cyan-500/30 text-[9px] font-bold text-cyan-400 tracking-widest whitespace-nowrap rounded-lg shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all pointer-events-none z-50">
       VERIFY GATE PASS
     </div>
+    
+    {/* Inline Animation Style */}
+    <style jsx>{`
+        @keyframes scan {
+            0% { top: 10%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 90%; opacity: 0; }
+        }
+        .animate-scanner-line {
+            animation: scan 1.5s linear infinite;
+        }
+    `}</style>
   </Link>
 );
 
@@ -362,7 +381,7 @@ export default function Home() {
             
             {/* DESKTOP MENU (Hidden on Mobile) */}
             <div className="hidden md:flex items-center gap-4">
-                <ScannerLink /> {/* Added Scanner Button Here */}
+                <ScannerLink /> {/* ✅ UPDATED ANIMATED SCANNER BUTTON */}
                 <StatusBadge />
                 {user ? (
                     <div className="flex items-center gap-4 border-l border-white/10 pl-6">
@@ -404,12 +423,12 @@ export default function Home() {
                     <StatusBadge />
                 </div>
                 
-                {/* Mobile Scanner Button */}
-                <Link href="/scanner" className="w-full py-3 bg-white/5 border border-white/10 rounded-lg text-xs font-bold tracking-widest hover:bg-cyan-500/10 hover:border-cyan-500/50 hover:text-cyan-400 transition-all flex items-center justify-center gap-2">
-                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {/* Mobile Scanner Button (Updated Visibility) */}
+                <Link href="/scanner" className="w-full py-3 bg-cyan-950/20 border border-cyan-500/30 text-cyan-400 rounded-lg text-xs font-bold tracking-widest hover:bg-cyan-900/40 hover:text-white transition-all flex items-center justify-center gap-3 shadow-[0_0_15px_rgba(34,211,238,0.1)]">
+                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h4v2H5v4H3V3zm18 0h-4v2h2v4h2V3zM3 21h4v-2H5v-4H3v6zm18 0h-4v-2h2v-4h2v6zM8 12h8m-4-4v8" /> 
                    </svg>
-                   GATE SCANNER
+                   VERIFY GATE PASS
                 </Link>
                 
                 {user ? (
