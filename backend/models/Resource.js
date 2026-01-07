@@ -9,7 +9,14 @@ const ResourceSchema = new mongoose.Schema({
   description: { type: String }, 
   quantity: { type: Number, default: 1 },
   location: { type: String, required: true }, 
-  status: { type: String, default: 'Available' }, // Available, Claimed
+  
+  // UPDATED: Added 'Sold' to the enum to explicitly trigger the frontend glass effect
+  status: { 
+    type: String, 
+    default: 'Available',
+    enum: ['Available', 'Sold', 'Pending'] 
+  }, 
+  
   imageUrl: { type: String },
   
   // IDENTITY
