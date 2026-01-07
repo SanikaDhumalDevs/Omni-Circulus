@@ -161,6 +161,20 @@ const StatusBadge = () => (
   </div>
 );
 
+// --- NEW SCANNER BUTTON COMPONENT ---
+const ScannerLink = () => (
+  <Link href="/scanner" className="group relative flex items-center justify-center p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-cyan-500/10 hover:border-cyan-500/50 hover:text-cyan-400 text-slate-400 transition-all duration-300">
+    {/* High Quality Scan Viewfinder Icon */}
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h4v2H5v4H3V3zm18 0h-4v2h2v4h2V3zM3 21h4v-2H5v-4H3v6zm18 0h-4v-2h2v-4h2v6zM8 12h8m-4-4v8" /> 
+    </svg>
+    {/* Tooltip */}
+    <div className="absolute top-full mt-3 right-0 px-3 py-1.5 bg-slate-900 border border-white/20 text-[9px] font-bold text-white tracking-widest whitespace-nowrap rounded-lg shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all pointer-events-none z-50">
+      VERIFY GATE PASS
+    </div>
+  </Link>
+);
+
 const GlassCard = ({ title, subtitle, icon, accent, type }: any) => (
   <div className="group relative overflow-hidden flex flex-col justify-between p-8 h-72 w-full rounded-3xl border border-white/10 bg-slate-900/40 backdrop-blur-2xl transition-all duration-500 hover:bg-slate-800/60 hover:-translate-y-2 hover:shadow-[0_0_40px_-10px_rgba(0,0,0,0.7)] cursor-pointer text-left">
     <div className={`absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-700 bg-gradient-to-br ${accent === 'orange' ? 'from-orange-500 via-amber-500 to-transparent' : 'from-cyan-500 via-blue-500 to-transparent'}`} />
@@ -342,13 +356,13 @@ export default function Home() {
                 </div>
                 <div className="flex flex-col">
                     <span className="text-lg md:text-xl font-bold tracking-widest text-white leading-none">OMNI<span className="text-cyan-500">CIRCULUS</span></span>
-                    {/* Hides subtitle on small screens to save space */}
                     <span className="hidden sm:block text-[8px] md:text-[9px] text-slate-500 font-mono tracking-[0.3em] uppercase mt-1">Resource Intelligence</span>
                 </div>
             </div>
             
             {/* DESKTOP MENU (Hidden on Mobile) */}
-            <div className="hidden md:flex items-center gap-6">
+            <div className="hidden md:flex items-center gap-4">
+                <ScannerLink /> {/* Added Scanner Button Here */}
                 <StatusBadge />
                 {user ? (
                     <div className="flex items-center gap-4 border-l border-white/10 pl-6">
@@ -370,7 +384,6 @@ export default function Home() {
 
             {/* MOBILE HAMBURGER BUTTON (Visible only on Mobile) */}
             <div className="md:hidden flex items-center gap-3">
-                {/* Shows abbreviated status or just dot if needed */}
                 <button 
                     onClick={toggleMobileMenu} 
                     className="p-2 rounded-lg border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white transition-all flex-shrink-0"
@@ -391,9 +404,17 @@ export default function Home() {
                     <StatusBadge />
                 </div>
                 
+                {/* Mobile Scanner Button */}
+                <Link href="/scanner" className="w-full py-3 bg-white/5 border border-white/10 rounded-lg text-xs font-bold tracking-widest hover:bg-cyan-500/10 hover:border-cyan-500/50 hover:text-cyan-400 transition-all flex items-center justify-center gap-2">
+                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h4v2H5v4H3V3zm18 0h-4v2h2v4h2V3zM3 21h4v-2H5v-4H3v6zm18 0h-4v-2h2v-4h2v6zM8 12h8m-4-4v8" /> 
+                   </svg>
+                   GATE SCANNER
+                </Link>
+                
                 {user ? (
                     <>
-                        <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-4 mt-2">
                             <div className="flex items-center gap-3">
                                 <div className="h-9 w-9 rounded-full bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center text-sm font-bold shadow-[0_0_10px_rgba(8,145,178,0.4)]">
                                     {user.username.charAt(0).toUpperCase()}

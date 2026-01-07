@@ -8,6 +8,9 @@ export default function SecurityScanner() {
     const [loading, setLoading] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     
+    // Define your backend URL here
+    const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
+    
     // A ref lock is still good practice to prevent multiple scans from processing
     const isProcessing = useRef(false);
 
@@ -18,7 +21,8 @@ export default function SecurityScanner() {
     const verifyTicket = async (text) => {
         setLoading(true);
         try {
-            const res = await fetch('http://localhost:5000/api/gate/verify', {
+            // Updated to use the live backend URL
+            const res = await fetch(`${API_BASE_URL}/api/gate/verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ qrData: text })
