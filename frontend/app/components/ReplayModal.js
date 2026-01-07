@@ -11,7 +11,8 @@ const ReplayModal = ({ dealId, onClose }) => {
   useEffect(() => {
     const fetchReplay = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/replay/${dealId}`);
+      // NEW
+const res = await fetch(`https://omni-circulus-backend.onrender.com/api/replay/${dealId}`);
         const data = await res.json();
         if (data.success) {
           setTimeline(data.timeline);
