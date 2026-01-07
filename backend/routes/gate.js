@@ -1,5 +1,7 @@
-const router = require('express').Router();
-const Negotiation = require('../models/Negotiation');
+const express = require('express');
+const router = express.Router();
+const mongoose = require('mongoose');
+const Negotiation = mongoose.model('Negotiation');
 
 // --- 🛡️ SECURITY GUARD SCANNER ENDPOINT ---
 router.post('/verify', async (req, res) => {
@@ -8,11 +10,23 @@ router.post('/verify', async (req, res) => {
         
         console.log("👮 Guard Scanned:", qrData);
 
-        // 1. Check Database for this Gate Pass ID
-        // We look for a deal where the 'logistics.gatePassId' matches the scan
-        const deal = await Negotiation.findOne({ 
-            'logistics.gatePassId': qrData 
-        });
+        if (!qrData) {
+            return res.json({ valid: false, message: "NO DATA DETECTED" });
+        }
+
+        // 1. Check Database
+        // We look for a deal where:
+        // A) The 'logistics.gatePassId' matches the scan (e.g. "GP-928312")
+        // B) OR the Deal ID matches (if the QR contains the raw ID)
+        
+        let query = { 'logistics.gatePassId': qrData };
+
+        // If the scanned code looks like a MongoDB ID, checks that too
+        if (mongoose.isValidObjectId(qrData)) {
+            query = { $or: [{ _id: qrData }, { 'logistics.gatePassId': qrData }] };
+        }
+
+        const deal = await Negotiation.findOne(query);
 
         if (!deal) {
             return res.json({ 
@@ -22,7 +36,8 @@ router.post('/verify', async (req, res) => {
         }
 
         // 2. Check if Payment is Confirm
-        if (deal.status !== 'PAID' && deal.status !== 'COMPLETED') {
+        // We allow 'PAID', 'COMPLETED', or 'APPROVED' (depending on your flow)
+        if (deal.status !== 'PAID' && deal.status !== 'COMPLETED' && deal.status !== 'APPROVED') {
              return res.json({ 
                 valid: false, 
                 message: "⚠️ PAYMENT PENDING: Goods not released." 
@@ -34,14 +49,15 @@ router.post('/verify', async (req, res) => {
             valid: true,
             message: "✅ ACCESS GRANTED",
             details: {
-                driver: deal.logistics.driverName,
-                truck: deal.logistics.truckNumber,
-                item: "Industrial Material" // You can fetch item name if needed
+                driver: deal.logistics?.driverName || "Unknown",
+                truck: deal.logistics?.truckNumber || "Unknown",
+                item: "Industrial Material" 
             }
         });
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error("Gate Error:", err);
+        res.status(500).json({ error: "Server Error" });
     }
 });
 
