@@ -294,7 +294,7 @@ export default function Home() {
   const confirmPayment = async () => {
     setProcessing(true);
     try {
-        const negotiationId = selectedOrder.id || selectedOrder._id; 
+        const negotiationId = selectedOrder.id || selectedOrder._id; // Handle both ID types
         const res = await fetch(`${API_BASE_URL}/api/transaction/pay`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -326,44 +326,52 @@ export default function Home() {
         <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:40px_40px]"></div>
       </div>
 
-      <nav className="relative z-50 w-full px-6 md:px-12 py-6 flex justify-between items-center border-b border-white/5 bg-[#020617]/50 backdrop-blur-xl">
-        <div className="flex items-center gap-4">
-          <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center shadow-[0_0_20px_rgba(8,145,178,0.4)] ring-1 ring-white/20">
-             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+      {/* --- FULLY RESPONSIVE NAVBAR --- */}
+      <nav className="relative z-50 w-full px-4 md:px-12 py-4 md:py-6 flex justify-between items-center border-b border-white/5 bg-[#020617]/50 backdrop-blur-xl">
+        <div className="flex items-center gap-2 md:gap-4">
+          <div className="relative h-8 w-8 md:h-10 md:w-10 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center shadow-[0_0_20px_rgba(8,145,178,0.4)] ring-1 ring-white/20">
+             <svg className="w-4 h-4 md:w-5 md:h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
           <div className="flex flex-col">
-            <span className="text-xl font-bold tracking-widest text-white leading-none">OMNI<span className="text-cyan-500">CIRCULUS</span></span>
-            <span className="text-[9px] text-slate-500 font-mono tracking-[0.3em] uppercase mt-1">Resource Intelligence</span>
+            <span className="text-lg md:text-xl font-bold tracking-widest text-white leading-none">OMNI<span className="text-cyan-500">CIRCULUS</span></span>
+            <span className="text-[8px] md:text-[9px] text-slate-500 font-mono tracking-[0.3em] uppercase mt-0.5 md:mt-1">Resource Intelligence</span>
           </div>
         </div>
         
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2 md:gap-6">
           <StatusBadge />
           {user ? (
-            <div className="flex items-center gap-4 border-l border-white/10 pl-6">
-              <button onClick={() => setShowDashboard(true)} className="hidden md:flex items-center gap-2 px-4 py-2 bg-cyan-900/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-bold tracking-widest hover:bg-cyan-500/20 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all animate-pulse">
-                COMMAND CENTER
+            <div className="flex items-center gap-2 md:gap-4 border-l border-white/10 pl-3 md:pl-6">
+              {/* Responsive Command Center Button */}
+              <button onClick={() => setShowDashboard(true)} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-cyan-900/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-[10px] md:text-xs font-bold tracking-widest hover:bg-cyan-500/20 hover:shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all animate-pulse">
+                <span className="md:hidden">CMD</span>
+                <span className="hidden md:inline">COMMAND CENTER</span>
               </button>
-              <div className="text-right hidden sm:block">
-                <div className="text-xs text-white font-bold uppercase tracking-wider">{user.username}</div>
+              
+              <div className="text-right">
+                <div className="text-[10px] md:text-xs text-white font-bold uppercase tracking-wider max-w-[80px] md:max-w-none truncate">{user.username}</div>
               </div>
-              <button onClick={handleLogout} className="text-xs text-red-400 hover:text-white border border-red-900/30 bg-red-900/10 px-3 py-2 rounded-lg hover:bg-red-600 transition-all">EXIT</button>
+              
+              <button onClick={handleLogout} className="text-[10px] md:text-xs text-red-400 hover:text-white border border-red-900/30 bg-red-900/10 px-3 py-1.5 md:px-4 md:py-2 rounded-lg hover:bg-red-600 transition-all">
+                  <span className="md:hidden">EXIT</span>
+                  <span className="hidden md:inline">DISCONNECT</span>
+              </button>
             </div>
           ) : (
-            <div className="flex items-center gap-4 border-l border-white/10 pl-6">
-              <Link href="/auth"><button className="text-xs text-slate-400 hover:text-white font-mono tracking-wider transition-colors">LOGIN</button></Link>
-              <Link href="/auth"><button className="text-xs bg-cyan-600 hover:bg-cyan-500 text-black font-bold px-5 py-2 rounded-lg tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all">JOIN</button></Link>
+            <div className="flex items-center gap-2 md:gap-4 border-l border-white/10 pl-3 md:pl-6">
+              <Link href="/auth"><button className="text-[10px] md:text-xs text-slate-400 hover:text-white font-mono tracking-wider transition-colors">LOGIN</button></Link>
+              <Link href="/auth"><button className="text-[10px] md:text-xs bg-cyan-600 hover:bg-cyan-500 text-black font-bold px-3 py-1.5 md:px-5 md:py-2 rounded-lg tracking-wider shadow-[0_0_15px_rgba(6,182,212,0.4)] transition-all">JOIN</button></Link>
             </div>
           )}
         </div>
       </nav>
 
-      <div className="relative z-10 flex flex-col items-center justify-center pt-24 px-4 text-center">
-        <h1 className="text-5xl md:text-8xl font-black tracking-tighter mb-8 leading-[1.1] drop-shadow-2xl">
+      <div className="relative z-10 flex flex-col items-center justify-center pt-20 md:pt-24 px-4 text-center">
+        <h1 className="text-4xl md:text-8xl font-black tracking-tighter mb-6 md:mb-8 leading-[1.1] drop-shadow-2xl">
           <span className="block text-white">RESOURCE</span>
           <span className="block text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 animate-gradient">INTELLIGENCE</span>
         </h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl px-4 pb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 w-full max-w-5xl px-4 pb-12">
           <Link href={user ? "/give" : "/auth"} className="w-full">
             <GlassCard type="Supplier" accent="orange" title="I Have Stock" subtitle="Upload a photo of your leftovers. AI identifies and lists it." icon={<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>} />
           </Link>
