@@ -53,68 +53,84 @@ export default function Marketplace() {
 
       {/* THE GRID */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {resources.map((item) => (
-          // CHANGED: Link removed, replaced with a static DIV
-          <div key={item._id} className="group relative bg-slate-900/40 border border-white/10 rounded-2xl overflow-hidden hover:border-cyan-500/50 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
-            
-            {/* Hover Glow */}
-            <div className="absolute inset-0 bg-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+        {resources.map((item) => {
+          // Check if item is sold based on the backend status
+          const isSold = item.status === 'Sold' || item.status === 'Claimed';
 
-            {/* --- IMAGE SECTION --- */}
-            <div className="h-48 w-full bg-slate-950 border-b border-white/5 relative">
-              {item.imageUrl ? (
-                <img 
-                  src={item.imageUrl} 
-                  alt={item.title} 
-                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                />
-              ) : (
-                // PLACEHOLDER IF NO IMAGE
-                <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-950/50">
-                  <svg className="w-8 h-8 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-[10px] font-mono tracking-widest uppercase">Image Data Corrupted</span>
+          return (
+            <div key={item._id} className="group relative bg-slate-900/40 border border-white/10 rounded-2xl overflow-hidden hover:border-cyan-500/50 transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
+              
+              {/* --- OUT OF STOCK OVERLAY (Grey Glass Effect) --- */}
+              {isSold && (
+                <div className="absolute inset-0 z-50 bg-slate-900/70 backdrop-blur-[3px] flex flex-col items-center justify-center select-none">
+                  <div className="bg-white/10 border border-white/20 px-6 py-3 rounded-xl backdrop-blur-md shadow-2xl">
+                    <span className="text-white font-black tracking-widest text-xl">OUT OF STOCK</span>
+                  </div>
+                  <span className="text-slate-400 text-xs font-mono mt-3 uppercase tracking-widest">
+                    Deal Closed
+                  </span>
                 </div>
               )}
-              
-              {/* Price Badge Overlay */}
-              <div className="absolute top-4 right-4 bg-black/80 backdrop-blur border border-green-500/30 text-green-400 px-3 py-1 rounded text-sm font-mono font-bold">
-                 ₹{item.cost ? item.cost.toLocaleString() : 'NEGOTIABLE'}
-              </div>
-            </div>
 
-            {/* --- CONTENT SECTION --- */}
-            <div className="p-6 flex-1 flex flex-col">
-              <div className="flex justify-between items-start mb-2">
-                <span className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
-                  {item.type}
-                </span>
-                <span className="text-[10px] font-mono text-cyan-400">
-                  {new Date(item.createdAt).toLocaleDateString()}
-                </span>
-              </div>
+              {/* Hover Glow */}
+              <div className="absolute inset-0 bg-cyan-500/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
 
-              <h3 className="text-xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">
-                {item.title}
-              </h3>
-              
-              <p className="text-slate-400 text-sm mb-4 line-clamp-2 flex-1">
-                {item.description || "No technical specifications provided."}
-              </p>
-              
-              {/* Footer Data */}
-              <div className="flex items-center justify-between text-xs font-mono text-slate-500 border-t border-white/5 pt-4 mt-auto">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                  <span className="truncate max-w-[120px]">{item.location}</span>
+              {/* --- IMAGE SECTION --- */}
+              <div className={`h-48 w-full bg-slate-950 border-b border-white/5 relative ${isSold ? 'grayscale opacity-50' : ''}`}>
+                {item.imageUrl ? (
+                  <img 
+                    src={item.imageUrl} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                  />
+                ) : (
+                  // PLACEHOLDER IF NO IMAGE
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-600 bg-slate-950/50">
+                    <svg className="w-8 h-8 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-[10px] font-mono tracking-widest uppercase">Image Data Corrupted</span>
+                  </div>
+                )}
+                
+                {/* Price Badge Overlay */}
+                <div className="absolute top-4 right-4 bg-black/80 backdrop-blur border border-green-500/30 text-green-400 px-3 py-1 rounded text-sm font-mono font-bold">
+                   ₹{item.cost ? item.cost.toLocaleString() : 'NEGOTIABLE'}
                 </div>
-                <div className="text-slate-300">QTY: <span className="text-white font-bold">{item.quantity}</span></div>
               </div>
-            </div>
 
-          </div>
-        ))}
+              {/* --- CONTENT SECTION --- */}
+              <div className={`p-6 flex-1 flex flex-col ${isSold ? 'opacity-40' : ''}`}>
+                <div className="flex justify-between items-start mb-2">
+                  <span className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">
+                    {item.type}
+                  </span>
+                  <span className="text-[10px] font-mono text-cyan-400">
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">
+                  {item.title}
+                </h3>
+                
+                <p className="text-slate-400 text-sm mb-4 line-clamp-2 flex-1">
+                  {item.description || "No technical specifications provided."}
+                </p>
+                
+                {/* Footer Data */}
+                <div className="flex items-center justify-between text-xs font-mono text-slate-500 border-t border-white/5 pt-4 mt-auto">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-1.5 h-1.5 bg-green-500 rounded-full ${!isSold && 'animate-pulse'}`} />
+                    <span className="truncate max-w-[120px]">{item.location}</span>
+                  </div>
+                  <div className="text-slate-300">QTY: <span className="text-white font-bold">{item.quantity}</span></div>
+                </div>
+              </div>
+
+            </div>
+          );
+        })}
       </div>
       
       {/* Empty State */}
