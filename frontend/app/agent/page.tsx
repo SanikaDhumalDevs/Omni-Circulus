@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic'; 
@@ -324,6 +324,8 @@ export default function AgentPage() {
             <p className="text-[10px] text-slate-500 tracking-[0.3em] uppercase">OPERATOR: {user.username}</p>
         </div>
         <div className="flex gap-4">
+            {/* --- NEW BUTTON: MARKET --- */}
+            <button onClick={() => router.push('/marketplace')} className="text-xs text-cyan-500 hover:text-cyan-300 transition">[ MARKET ]</button>
             <button onClick={() => setShowHistory(true)} className="text-xs text-green-500 hover:text-green-300 transition">[ HISTORY ]</button>
             <button onClick={() => router.push('/')} className="text-xs text-slate-500 hover:text-white transition">[ EXIT ]</button>
         </div>
