@@ -62,36 +62,139 @@ if (process.env.SENDGRID_API_KEY) {
 const VERIFIED_SENDER = 'sanikadhumal149@gmail.com'; 
 
 // ==========================================
-// 3. EMAIL HELPER FUNCTION
+// 3. EMAIL HELPER FUNCTION (UPDATED UI 🎨)
 // ==========================================
+
+// Helper to generate the Professional HTML Template
+const generateEmailTemplate = (role, itemTitle, amountLabel, amount, link, linkText, extraDetails = "") => {
+  return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #020617; font-family: 'Courier New', monospace; color: #e2e8f0;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+      <tr>
+        <td align="center" style="padding: 40px 10px;">
+          
+          <!-- MAIN CARD -->
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background-color: #0f172a; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+            
+            <!-- ACCENT HEADER -->
+            <tr>
+              <td height="4" style="background: linear-gradient(90deg, #06b6d4, #3b82f6);"></td>
+            </tr>
+
+            <!-- BRANDING -->
+            <tr>
+              <td style="padding: 30px; text-align: center; border-bottom: 1px solid #1e293b;">
+                <h1 style="margin: 0; color: #fff; font-size: 24px; letter-spacing: 4px; font-weight: 800;">
+                  OMNI<span style="color: #22d3ee;">CIRCULUS</span>
+                </h1>
+                <p style="margin: 5px 0 0; color: #64748b; font-size: 10px; text-transform: uppercase; letter-spacing: 2px;">
+                  Secure Negotiation Protocol
+                </p>
+              </td>
+            </tr>
+
+            <!-- CONTENT -->
+            <tr>
+              <td style="padding: 40px;">
+                <div style="border-left: 4px solid #22d3ee; padding-left: 15px; margin-bottom: 25px;">
+                  <h2 style="margin: 0; color: #fff; font-size: 18px; text-transform: uppercase;">ACTION REQUIRED: ${role}</h2>
+                  <p style="margin: 5px 0 0; color: #94a3b8; font-size: 12px;">Item: ${itemTitle}</p>
+                </div>
+
+                <p style="color: #cbd5e1; line-height: 1.6; font-size: 14px; margin-bottom: 30px;">
+                  The negotiation AI has finalized the terms. Please review the financial summary below and authorize the transaction to proceed.
+                </p>
+
+                <!-- DETAILS TABLE -->
+                <table width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #1e293b; border-radius: 8px; margin-bottom: 30px; border: 1px solid #334155;">
+                  <tr>
+                    <td style="padding: 15px; color: #94a3b8; font-size: 12px; text-transform: uppercase;">${amountLabel}</td>
+                    <td style="padding: 15px; color: #fff; font-size: 18px; font-weight: bold; text-align: right;">₹${amount}</td>
+                  </tr>
+                  ${extraDetails}
+                </table>
+
+                <!-- CTA BUTTON -->
+                <table width="100%" cellspacing="0" cellpadding="0" border="0">
+                  <tr>
+                    <td align="center">
+                      <a href="${link}" style="display: inline-block; background-color: #06b6d4; color: #000; padding: 16px 32px; font-size: 14px; font-weight: 800; text-decoration: none; border-radius: 6px; text-transform: uppercase; letter-spacing: 1px; border: 1px solid #22d3ee;">
+                        ${linkText}
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="text-align: center; color: #475569; font-size: 10px; margin-top: 30px;">
+                  Link expires in 24 hours. Automated System Message.
+                </p>
+              </td>
+            </tr>
+
+            <!-- FOOTER -->
+            <tr>
+              <td style="background-color: #020617; padding: 15px; text-align: center; border-top: 1px solid #1e293b;">
+                <p style="color: #334155; font-size: 10px; margin: 0;">&copy; 2025 Omni Circulus Network.</p>
+              </td>
+            </tr>
+          </table>
+
+        </td>
+      </tr>
+    </table>
+  </body>
+  </html>
+  `;
+};
+
 const sendConfirmationEmails = async (negotiation, buyerLink, sellerLink) => {
   console.log(`📨 Sending emails via SendGrid...`);
   
-  const itemTitle = negotiation.resourceId?.title || "Resource";
+  const itemTitle = negotiation.resourceId?.title || "Industrial Resource";
+  
+  // Buyer Details
+  const buyerExtra = `
+    <tr>
+      <td style="padding: 15px; border-top: 1px solid #334155; color: #94a3b8; font-size: 12px; text-transform: uppercase;">Delivery Location</td>
+      <td style="padding: 15px; border-top: 1px solid #334155; color: #cbd5e1; font-size: 12px; text-align: right;">${negotiation.buyerLocation}</td>
+    </tr>
+  `;
 
+  // 1. Construct Buyer Message
   const buyerMsg = {
     to: negotiation.buyerEmail,
     from: VERIFIED_SENDER, 
-    subject: `Action Required: Confirm Purchase for ${itemTitle}`,
-    html: `
-      <h2>Purchase Confirmation</h2>
-      <p><strong>Total Payable:</strong> ₹${negotiation.totalValue}</p>
-      <p><strong>Location:</strong> ${negotiation.buyerLocation}</p>
-      <br/>
-      <a href="${buyerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ CONFIRM PURCHASE</a>
-    `
+    subject: `ACTION REQUIRED: Confirm Purchase for ${itemTitle}`,
+    html: generateEmailTemplate(
+      "BUYER APPROVAL", 
+      itemTitle, 
+      "Total Payable (Inc. Transport)", 
+      negotiation.totalValue, 
+      buyerLink, 
+      "✅ CONFIRM PURCHASE", 
+      buyerExtra
+    )
   };
 
+  // 2. Construct Seller Message
   const sellerMsg = {
     to: negotiation.sellerEmail,
     from: VERIFIED_SENDER,
-    subject: `Action Required: Approve Sale for ${itemTitle}`,
-    html: `
-      <h2>Sale Approval</h2>
-      <p><strong>Net Payout:</strong> ₹${negotiation.finalPrice}</p>
-      <br/>
-      <a href="${sellerLink}" style="background-color:#16a34a;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;">✅ APPROVE SALE</a>
-    `
+    subject: `ACTION REQUIRED: Approve Sale for ${itemTitle}`,
+    html: generateEmailTemplate(
+      "SELLER APPROVAL", 
+      itemTitle, 
+      "Net Payout (Excl. Transport)", 
+      negotiation.finalPrice, 
+      sellerLink, 
+      "✅ APPROVE SALE"
+    )
   };
 
   try {
