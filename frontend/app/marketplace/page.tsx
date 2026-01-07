@@ -6,15 +6,27 @@ export default function Marketplace() {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Define your backend URL here
+  const API_BASE_URL = 'https://omni-circulus-backend.onrender.com';
+
   // 1. Fetch Data from Backend
   useEffect(() => {
-    fetch('http://localhost:5000/api/resources/all')
-      .then((res) => res.json())
+    // Changed localhost to your live backend URL
+    fetch(`${API_BASE_URL}/api/resources/all`)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! Status: ${res.status}`);
+        }
+        return res.json();
+      })
       .then((data) => {
         setResources(data);
         setLoading(false);
       })
-      .catch((err) => console.error('Failed to load market:', err));
+      .catch((err) => {
+        console.error('Failed to load market:', err);
+        setLoading(false);
+      });
   }, []);
 
   return (
@@ -27,7 +39,7 @@ export default function Marketplace() {
             GLOBAL STOCKPILE
           </h1>
           <p className="text-slate-400 mt-2 font-mono text-xs tracking-widest uppercase">
-            Live Industrial Feed • Region: US-EAST
+            Live Industrial Feed • Region: GLOBAL
           </p>
         </div>
         <Link href="/" className="px-4 py-2 rounded-lg border border-white/10 hover:bg-white/5 text-xs font-mono transition">
