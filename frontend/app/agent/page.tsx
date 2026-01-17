@@ -132,14 +132,47 @@ export default function AgentPage() {
 
   }, [negotiation?.status]);
 
-  const handleGPS = () => {
-    if (!navigator.geolocation) { alert("Geolocation not supported"); return; }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => { setBuyerLocation(`${pos.coords.latitude}, ${pos.coords.longitude}`); setLocating(false); },
-      () => { alert("⚠️ GPS Error."); setLocating(false); }
-    );
+  // --- NEW CODE (PASTE THIS) ---
+const handleGPS = () => {
+  if (!navigator.geolocation) { 
+    alert("Geolocation is not supported by your browser"); 
+    return; 
+  }
+  
+  setLocating(true);
+  
+  // Options for better accuracy
+  const options = {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0
   };
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => { 
+      setBuyerLocation(`${pos.coords.latitude}, ${pos.coords.longitude}`); 
+      setLocating(false); 
+    },
+    (error) => { 
+      console.error("GPS Error Details:", error);
+      
+      let msg = "⚠️ GPS Error.";
+      
+      // Check specific error codes
+      if (error.code === 1) {
+        msg = "❌ Permission Denied. Please allow location access in your browser settings or ensure you are using HTTPS.";
+      } else if (error.code === 2) {
+        msg = "❌ Location Unavailable. Your device cannot find a signal.";
+      } else if (error.code === 3) {
+        msg = "❌ Location Timeout. The request took too long.";
+      }
+      
+      alert(msg); 
+      setLocating(false); 
+    },
+    options
+  );
+};
 
   // --- MAIN NEGOTIATION LOOP ---
   useEffect(() => {
