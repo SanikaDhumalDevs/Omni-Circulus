@@ -444,12 +444,15 @@ const handleGPS = () => {
                 {activeRequests.length === 0 ? <p className="text-slate-600 text-xs italic">No active background missions.</p> : (
                     <div className="space-y-2">
                         {activeRequests.map(req => {
-                            if (req.matchedResourceId && isResourceBought(req.matchedResourceId)) return null;
+                            // 1. SAFELY GET ID AND CHECK IF BOUGHT
+                            const resourceId = req.matchedResourceId?._id || req.matchedResourceId;
+                            if (resourceId && isResourceBought(resourceId)) return null;
+
                             return (
                                 <div key={req._id} className={`p-3 rounded border flex justify-between items-center ${req.status === 'FOUND' ? 'bg-green-900/10 border-green-500/50' : 'bg-slate-900/40 border-slate-800'}`}>
                                     <span className="text-xs text-slate-300"><span className="text-cyan-600 font-bold">MISSION:</span> "{req.prompt}"</span>
-                                    {req.status === 'FOUND' && req.matchedResourceId ? (
-                                        <button onClick={() => handleNegotiate(req.matchedResourceId)} className="text-[10px] bg-green-600 text-black font-bold px-3 py-1 rounded shadow hover:bg-green-500">MATCH FOUND</button>
+                                    {req.status === 'FOUND' && resourceId ? (
+                                        <button onClick={() => handleNegotiate(resourceId)} className="text-[10px] bg-green-600 text-black font-bold px-3 py-1 rounded shadow hover:bg-green-500">MATCH FOUND</button>
                                     ) : (
                                         <span className="text-[9px] text-yellow-500 animate-pulse">SEARCHING...</span>
                                     )}
